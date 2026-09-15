@@ -10,5 +10,21 @@
     {"start": 10, "end": 15, "eyebrow": "LA ESCALA", "headline": ["ACTIVISION", "APROVECHÓ", "EL MOMENTO"], "metric": "FRANQUICIA", "caption": "El éxito parecía no tener techo."},
     {"start": 15, "end": 21, "eyebrow": "EL GIRO", "headline": ["EL MERCADO", "SE", "SATURÓ"], "metric": "DEMASIADOS TÍTULOS", "caption": "El ritmo de lanzamientos agotó la demanda."},
     {"start": 21, "end": 27, "eyebrow": "LA LECCIÓN", "headline": ["UN ÉXITO", "TAMBIÉN", "PUEDE CAER"], "metric": "VENTAS A LA BAJA", "caption": "Incluso un fenómeno millonario puede desaparecer."}
+  ],
+  "entities": {
+    "franchises": ["Guitar Hero"],
+    "companies": ["Activision"],
+    "themes": ["rhythm game", "gaming accessories", "market saturation"]
+  },
+  "visual_queries": [
+    {"text": "Guitar Hero controller", "kind": "specific", "primary": "Guitar Hero", "category": "Franquicias", "franchise": "Guitar Hero"},
+    {"text": "Guitar Hero gameplay", "kind": "specific", "primary": "Guitar Hero", "category": "Gameplay", "franchise": "Guitar Hero"},
+    {"text": "Activision logo office", "kind": "specific", "primary": "Activision", "category": "Empresas", "company": "Activision"},
+    {"text": "electric guitar concert", "kind": "contextual", "primary": "electric guitar", "category": "Tecnología"},
+    {"text": "music video game accessories", "kind": "contextual", "primary": "gaming accessories", "category": "Tecnología"}
+  ],
+  "asset_requirements": [
+    {"kind": "specific", "description": "Guitar Hero controllers and franchise material", "queries": ["Guitar Hero controller", "Guitar Hero gameplay"]},
+    {"kind": "contextual", "description": "Music, concerts and gaming peripherals", "queries": ["electric guitar concert", "music video game accessories"]}
   ]
 }
