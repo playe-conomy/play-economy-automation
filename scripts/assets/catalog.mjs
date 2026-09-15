@@ -30,7 +30,7 @@ export function allowedLicense(candidate) {
   if (!license || /unknown|all rights reserved|noncommercial|\bnc\b|no derivatives|\bnd\b/.test(license)) {
     return { allowed: false, reason: "license-not-reusable" };
   }
-  if (/cc0|public domain|pdm|cc-by|cc by/.test(license)) {
+  if (/cc0|public domain|pdm|cc[- ]by(?:[- ]sa)?/.test(license)) {
     return { allowed: true, reason: "reusable-license" };
   }
   return { allowed: false, reason: "license-not-on-allowlist" };
@@ -55,9 +55,14 @@ export function classifyAsset(candidate, query) {
   const consoleEvidence = /playstation|xbox|nintendo|console|ps2|ps3|ps4/.test(text);
   const technologyEvidence = /electric guitar|guitar|controller|peripheral|accessor/.test(text);
   if (query.intent === "gameplay" && related && gameplayEvidence) return { role: "gameplay", category: "Gameplay", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "character" && related) return { role: "character", category: "Personajes", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "official_art" && related) return { role: "official_art", category: "Arte Oficial", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "map" && related) return { role: "map", category: "Mapas", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "playeconomy_graphic") return { role: "playeconomy_graphic", category: "Gráficos PLAYECONOMY", entity: null, confidence: "high" };
   if (query.intent === "company" && (related || companyEvidence)) return { role: "company", category: "Empresas", entity: query.target_entity, confidence: "high" };
   if (query.intent === "console" && consoleEvidence) return { role: "console", category: "Consolas", entity: query.target_entity, confidence: "high" };
   if (query.intent === "specific" && related) return { role: "specific", category: "Franquicias", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "technology") return { role: "technology", category: "Tecnología", entity: null, confidence: technologyEvidence ? "high" : "medium" };
   if (query.intent === "contextual_broll" || technologyEvidence) return { role: "contextual_broll", category: "Tecnología", entity: null, confidence: technologyEvidence ? "medium" : "low" };
   return { role: "contextual_broll", category: query.target_category ?? "Tecnología", entity: null, confidence: "low" };
 }
