@@ -8,9 +8,30 @@ export function driveConfiguration() {
 }
 
 export function driveDestination(candidate) {
-  const group = candidate.category ?? "Gráficos PLAYECONOMY";
-  const name = candidate.franchise ?? candidate.company ?? candidate.topic ?? "Unclassified";
-  return `02_Biblioteca Visual/${group}/${name}/`;
+  return resolveAssetDestination(candidate.assetRole, candidate).drivePath;
+}
+
+export function resolveAssetDestination(assetRole, metadata = {}) {
+  const entity = metadata.entity ?? metadata.franchise ?? metadata.company ?? metadata.console ?? null;
+  const folders = {
+    specific: "Franquicias",
+    gameplay: "Gameplay",
+    company: "Empresas",
+    console: "Consolas",
+    character: "Personajes",
+    official_art: "Arte Oficial",
+    map: "Mapas"
+  };
+  if (assetRole === "technology" || assetRole === "contextual_broll") {
+    return { finalCategory: "Tecnología", finalEntity: null, drivePath: "02_Biblioteca Visual/Tecnología/" };
+  }
+  if (assetRole === "playeconomy_graphic") {
+    return { finalCategory: "Gráficos PLAYECONOMY", finalEntity: null, drivePath: "02_Biblioteca Visual/Gráficos PLAYECONOMY/" };
+  }
+  const finalCategory = folders[assetRole] ?? "Tecnología";
+  const finalEntity = entity || null;
+  const suffix = finalEntity ? `${finalEntity}/` : "";
+  return { finalCategory, finalEntity, drivePath: `02_Biblioteca Visual/${finalCategory}/${suffix}` };
 }
 
 export async function uploadToDrive() {

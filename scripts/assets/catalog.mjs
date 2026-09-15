@@ -36,14 +36,30 @@ export function allowedLicense(candidate) {
   return { allowed: false, reason: "license-not-on-allowlist" };
 }
 
+export const CRITICAL_METADATA = ["source", "source_url", "title", "license"];
+export const OPTIONAL_METADATA = ["creator", "license_url", "attribution"];
+
+export function inspectMetadata(candidate) {
+  const missingFields = [];
+  if (!candidate.provider) missingFields.push("source");
+  if (!candidate.sourceUrl) missingFields.push("source_url");
+  if (!candidate.title) missingFields.push("title");
+  if (!candidate.license || /unknown/i.test(candidate.license)) missingFields.push("license");
+  const warnings = [];
+  if (!candidate.creator) warnings.push("creator_missing");
+  if (!candidate.licenseUrl && !/public domain|pdm/i.test(candidate.license ?? "")) warnings.push("license_url_missing");
+  if (!candidate.attribution && candidate.creator) warnings.push("attribution_missing");
+  return { missingFields, warnings };
+}
+
 export function qualityTier(candidate) {
   const width = Number(candidate.width ?? 0);
   const height = Number(candidate.height ?? 0);
   const area = width * height;
   if (!width || !height) return { tier: "reject", score: -25, reason: "missing_dimensions" };
   if (width < 500 || height < 500 || area < 500000) return { tier: "low_resolution", score: -35, reason: "insufficient_resolution" };
-  if (area >= 2500000 && (width >= 1200 || height >= 1200)) return { tier: "high_quality", score: 25, reason: "high_quality" };
-  return { tier: "usable", score: 12, reason: "usable_resolution" };
+  if (area >= 2500000 && (width >= 1200 || height >= 1200)) return { tier: "high_quality", score: 32, reason: "high_quality" };
+  return { tier: "usable", score: 8, reason: "usable_resolution" };
 }
 
 export function classifyAsset(candidate, query) {
@@ -53,7 +69,7 @@ export function classifyAsset(candidate, query) {
   const gameplayEvidence = /gameplay|screenshot|screen shot|in-game|in game/.test(text);
   const companyEvidence = /activision|electronic arts|microsoft|sony|nintendo/.test(text);
   const consoleEvidence = /playstation|xbox|nintendo|console|ps2|ps3|ps4/.test(text);
-  const technologyEvidence = /electric guitar|guitar|controller|peripheral|accessor/.test(text);
+  const technologyEvidence = /electric guitar|guitar|controller|peripheral|accessor|turntable/.test(text);
   if (query.intent === "gameplay" && related && gameplayEvidence) return { role: "gameplay", category: "Gameplay", entity: query.target_entity, confidence: "high" };
   if (query.intent === "character" && related) return { role: "character", category: "Personajes", entity: query.target_entity, confidence: "high" };
   if (query.intent === "official_art" && related) return { role: "official_art", category: "Arte Oficial", entity: query.target_entity, confidence: "high" };
@@ -64,7 +80,7 @@ export function classifyAsset(candidate, query) {
   if (query.intent === "specific" && related) return { role: "specific", category: "Franquicias", entity: query.target_entity, confidence: "high" };
   if (query.intent === "technology") return { role: "technology", category: "Tecnología", entity: null, confidence: technologyEvidence ? "high" : "medium" };
   if (query.intent === "contextual_broll" || technologyEvidence) return { role: "contextual_broll", category: "Tecnología", entity: null, confidence: technologyEvidence ? "medium" : "low" };
-  return { role: "contextual_broll", category: query.target_category ?? "Tecnología", entity: null, confidence: "low" };
+  return { role: "contextual_broll", category: "Tecnología", entity: null, confidence: "low" };
 }
 
 export function findDuplicate(manifest, candidate, checksum) {
