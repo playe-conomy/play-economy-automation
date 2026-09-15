@@ -18,6 +18,11 @@ const genericGuitar = {
 };
 
 assert.equal(classifyAsset(controller, specificQuery).role, "specific");
+const hyphenatedControllerRole = classifyAsset({ ...controller, title: "Guitar-hero-controller-horiz.jpg" }, specificQuery);
+assert.equal(hyphenatedControllerRole.role, "specific");
+assert.deepEqual(resolveAssetDestination(hyphenatedControllerRole.role, { entity: hyphenatedControllerRole.entity }), {
+  finalCategory: "Franquicias", finalEntity: "Guitar Hero", drivePath: "02_Biblioteca Visual/Franquicias/Guitar Hero/"
+});
 assert.equal(scoreCandidate(controller, specificQuery).quality.tier, "high_quality");
 assert.equal(classifyAsset(genericGuitar, brollQuery).role, "contextual_broll");
 assert.notEqual(classifyAsset(genericGuitar, brollQuery).role, "gameplay");

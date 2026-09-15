@@ -63,8 +63,9 @@ export function qualityTier(candidate) {
 }
 
 export function classifyAsset(candidate, query) {
-  const text = `${candidate.title ?? ""} ${(candidate.tags ?? []).join(" ")} ${candidate.sourceUrl ?? ""}`.toLowerCase();
-  const target = (query.target_entity ?? query.primary ?? "").toLowerCase();
+  const normalize = (value) => String(value ?? "").toLowerCase().replace(/[-_]+/g, " ");
+  const text = normalize(`${candidate.title ?? ""} ${(candidate.tags ?? []).join(" ")} ${candidate.sourceUrl ?? ""}`);
+  const target = normalize(query.target_entity ?? query.primary ?? "");
   const related = target && text.includes(target);
   const gameplayEvidence = /gameplay|screenshot|screen shot|in-game|in game/.test(text);
   const companyEvidence = /activision|electronic arts|microsoft|sony|nintendo/.test(text);
@@ -120,10 +121,13 @@ export function sha256(buffer) {
 
 export function assetRecord(candidate, overrides = {}) {
   return {
-    id: overrides.id ?? `asset-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    id: overrides.id ?? `asset-${createHash("sha256").update(normalizeSourceUrl(candidate.sourceUrl ?? candidate.title ?? "asset")).digest("hex").slice(0, 16)}`,
     filename: overrides.filename ?? null,
     type: candidate.type ?? "image",
     category: candidate.category ?? null,
+    asset_role: candidate.assetRole ?? null,
+    final_category: candidate.category ?? null,
+    final_entity: candidate.finalEntity ?? null,
     franchise: candidate.franchise ?? null,
     company: candidate.company ?? null,
     console: candidate.console ?? null,
