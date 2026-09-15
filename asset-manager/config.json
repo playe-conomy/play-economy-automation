@@ -1,0 +1,22 @@
+{
+  "userAgent": "PlayEconomyAssetManager/3.0 (https://github.com/playe-conomy/play-economy-automation)",
+  "limits": {
+    "maxQueries": 8,
+    "resultsPerQuery": 4,
+    "maxDownloads": 5,
+    "maxRetries": 2,
+    "backoffMs": 500,
+    "httpTimeoutMs": 10000,
+    "globalTimeoutMs": 240000,
+    "maxFileBytes": 15728640
+  },
+  "scoring": {
+    "minimumScore": 38,
+    "preferVertical": true
+  },
+  "drive": {
+    "rootFolderId": "1fHW2P2RAASkGXYzT7Cl2BvcrephFZn27",
+    "libraryRoot": "02_Biblioteca Visual",
+    "categories": ["Empresas", "Franquicias", "Consolas", "Gameplay", "Personajes", "Mapas", "Arte Oficial", "Concept Art", "Tecnología", "Gráficos PLAYECONOMY"]
+  }
+}
