@@ -1,0 +1,63 @@
+name: 🎮 Generar video Play Economy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generar-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Descargar generador
+        uses: actions/checkout@v4
+        with:
+          repository: itsPremkumar/Automated-Video-Generator
+          path: video-generator
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: video-generator/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: video-generator
+        run: npm ci
+
+      - name: Instalar narración gratuita
+        run: |
+          python -m pip install --upgrade pip
+          pip install edge-tts
+
+      - name: Crear guion Guitar Hero
+        working-directory: video-generator
+        run: |
+          cat > input/scripts/input-scripts.json <<'EOF'
+          [
+            {
+              "id": "guitar-hero-play-economy",
+              "title": "¿Qué pasó con Guitar Hero?",
+              "script": "Hubo una época en la que parecía que todos querían ser una estrella de rock. [Visual: guitar hero video game controller]\n\nGuitar Hero convirtió una guitarra de plástico en uno de los negocios más grandes del gaming. [Visual: people playing rhythm video game]\n\nActivision llegó a lanzar juegos de la franquicia prácticamente cada año, mientras vendía guitarras, baterías y otros accesorios. [Visual: video game accessories collection]\n\nPero el éxito terminó convirtiéndose en su mayor problema. [Visual: crowded retail video game store]\n\nDemasiados lanzamientos, demasiados accesorios y un mercado que empezó a cansarse hicieron que las ventas cayeran. [Visual: declining sales graph]\n\nEn 2011 llegó Guitar Hero Warriors of Rock y después la franquicia desapareció durante varios años. [Visual: empty game store shelf]\n\nGuitar Hero regresó en 2015 con Guitar Hero Live, pero ya no consiguió recuperar el fenómeno original. [Visual: guitar rhythm game performance]\n\nLa historia de Guitar Hero demuestra algo importante: en videojuegos, incluso un negocio millonario puede desaparecer cuando el mercado se satura. [Visual: gaming industry business concept]\n\n🎮 PLAY ECONOMY — El negocio detrás de los videojuegos.",
+              "orientation": "portrait",
+              "voice": "es-CO-GonzaloNeural",
+              "showText": true,
+              "language": "spanish"
+            }
+          ]
+          EOF
+
+      - name: Generar video
+        working-directory: video-generator
+        env:
+          TTS_PROVIDER: edge-tts
+          OPENVERSE_ENABLED: "true"
+        run: npm run generate
+
+      - name: Guardar video generado
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-economy-guitar-hero
+          path: video-generator/output/**
+          retention-days: 7
