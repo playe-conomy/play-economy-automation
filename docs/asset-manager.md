@@ -21,6 +21,24 @@ Candidates require source, author/attribution data and an allowlisted reusable l
 
 The score combines query-term relevance, supported image type, resolution, portrait friendliness or crop/pan eligibility, and license quality. The default minimum is 38. URL dedupe removes trackers/fragments before comparing a candidate against `normalized_source_url`; a SHA-256 checksum field is reserved for actual downloaded files. A future perceptual-hash stage can be added without changing the manifest.
 
+## V3.1 selection audit
+
+Every searched candidate is retained in `rejected_candidates` or `proposed_downloads` in `asset-manager/reports/latest.json`. Rejections include structured reasons such as `license_unknown`, `license_not_allowed`, `insufficient_resolution`, `unsupported_mime`, `missing_metadata`, `invalid_url`, `duplicate`, and `diversity_limit`, while `rejection_summary` exposes provider totals.
+
+Openverse license short codes are normalized before filtering: `by` becomes `CC BY`, `by-sa` becomes `CC BY-SA`, `cc0` stays `CC0`, and `pdm` becomes `Public Domain`. The allowlist remains conservative and still rejects unknown, NC and ND licenses.
+
+Queries carry `query`, `intent`, `target_category` and `target_entity`. Classification is determined from candidate metadata: gameplay needs both franchise relevance and gameplay evidence, so a generic electric guitar remains `contextual_broll` instead of becoming `gameplay`. Candidate records expose `asset_role`, confidence, quality tier, a relevance/resolution/license/orientation/specificity score breakdown, total score and reasons. Quality tiers are `high_quality`, `usable`, `low_resolution` and `reject`; dimensions under 500px or 500,000 pixels receive a strong penalty.
+
+The dry run limits each query/role/category combination to two proposed assets, preserving lightweight visual diversity without relaxing licensing or relevance filters. `scripts/assets/catalog.test.mjs` covers franchise-specific classification, generic contextual guitar classification, low-resolution penalties and unknown-license rejection.
+
+## V3.1.1 destination and metadata audit
+
+`resolveAssetDestination` is the single destination mapping. It resolves an asset role after classification, not the query intent: franchise-specific assets go to their franchise category, while contextual b-roll such as generic guitars or DJ Hero turntables goes to `Tecnología/` without inheriting the Guitar Hero topic folder.
+
+Critical metadata is `source`, `source_url`, `title`, and `license`. Missing critical fields reject a candidate with `missing_fields`. `creator`, `license_url`, and attribution are optional and appear as `metadata_warnings` where appropriate. Verifiable Public Domain material may therefore retain `license_url: null` and `creator: null` without an automatic `missing_metadata` rejection.
+
+High-quality images receive a larger resolution advantage than usable images so portrait orientation cannot offset a materially lower resolution. The existing low-resolution and reject thresholds remain unchanged.
+
 ## Limits and failures
 
 `asset-manager/config.json` caps queries (8), results per query (4), downloads (5), retries (2), per-request timeout (10 seconds), global work (4 minutes), and file size (15 MB). 429 and 5xx replies receive at most two exponential-backoff retries. Any provider error is logged and the other provider continues. There are no unbounded loops.
@@ -40,8 +58,3 @@ From **Actions**, choose **PlayEconomy Asset Manager**, keep `content/guitar-her
 ## Later real downloads and renderer V3
 
 Before enabling real downloads, implement a reviewed download-and-checksum stage, configure Drive OIDC, grant the narrow Drive folder permission, and add an explicit upload flag separate from the video renderer. Renderer V3 can then select only `approved` reusable manifest records. Until then, V2 remains unchanged and fully functional.
-## V3.1 selection audit
-Every searched candidate is retained in `rejected_candidates` or `proposed_downloads` in `asset-manager/reports/latest.json`. Rejections include structured reasons such as `license_unknown`, `license_not_allowed`, `insufficient_resolution`, `unsupported_mime`, `missing_metadata`, `invalid_url`, `duplicate`, and `diversity_limit`, while `rejection_summary` exposes provider totals.
-Openverse license short codes are normalized before filtering: `by` becomes `CC BY`, `by-sa` becomes `CC BY-SA`, `cc0` stays `CC0`, and `pdm` becomes `Public Domain`. The allowlist remains conservative and still rejects unknown, NC and ND licenses.
-Queries carry `query`, `intent`, `target_category` and `target_entity`. Classification is determined from candidate metadata: gameplay needs both franchise relevance and gameplay evidence, so a generic electric guitar remains `contextual_broll` instead of becoming `gameplay`. Candidate records expose `asset_role`, confidence, quality tier, a relevance/resolution/license/orientation/specificity score breakdown, total score and reasons. Quality tiers are `high_quality`, `usable`, `low_resolution` and `reject`; dimensions under 500px or 500,000 pixels receive a strong penalty.
-The dry run limits each query/role/category combination to two proposed assets, preserving lightweight visual diversity without relaxing licensing or relevance filters. `scripts/assets/catalog.test.mjs` covers franchise-specific classification, generic contextual guitar classification, low-resolution penalties and unknown-license rejection.
