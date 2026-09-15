@@ -17,11 +17,11 @@
     "themes": ["rhythm game", "gaming accessories", "market saturation"]
   },
   "visual_queries": [
-    {"text": "Guitar Hero controller", "kind": "specific", "primary": "Guitar Hero", "category": "Franquicias", "franchise": "Guitar Hero"},
-    {"text": "Guitar Hero gameplay", "kind": "specific", "primary": "Guitar Hero", "category": "Gameplay", "franchise": "Guitar Hero"},
-    {"text": "Activision logo office", "kind": "specific", "primary": "Activision", "category": "Empresas", "company": "Activision"},
-    {"text": "electric guitar concert", "kind": "contextual", "primary": "electric guitar", "category": "Tecnología"},
-    {"text": "music video game accessories", "kind": "contextual", "primary": "gaming accessories", "category": "Tecnología"}
+    {"query": "Guitar Hero controller", "intent": "specific", "target_category": "Franquicias", "target_entity": "Guitar Hero"},
+    {"query": "Guitar Hero gameplay", "intent": "gameplay", "target_category": "Gameplay", "target_entity": "Guitar Hero"},
+    {"query": "Activision logo office", "intent": "company", "target_category": "Empresas", "target_entity": "Activision"},
+    {"query": "electric guitar concert", "intent": "contextual_broll", "target_category": "Tecnología", "target_entity": null},
+    {"query": "music video game accessories", "intent": "technology", "target_category": "Tecnología", "target_entity": null}
   ],
   "asset_requirements": [
     {"kind": "specific", "description": "Guitar Hero controllers and franchise material", "queries": ["Guitar Hero controller", "Guitar Hero gameplay"]},
