@@ -1,0 +1,50 @@
+name: PlayEconomy Asset Manager
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_file:
+        description: Content definition to analyze
+        required: true
+        default: content/guitar-hero.json
+      dry_run:
+        description: Analyze candidates without downloads, Drive writes, or manifest changes
+        required: true
+        type: boolean
+        default: true
+      max_downloads:
+        description: Maximum proposed downloads when dry run is disabled
+        required: true
+        default: "5"
+
+permissions:
+  contents: read
+
+jobs:
+  manage-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Analyze visual asset candidates
+        run: |
+          node scripts/assets/asset-manager.mjs \
+            --content "${{ inputs.content_file }}" \
+            --dry-run "${{ inputs.dry_run }}" \
+            --max-downloads "${{ inputs.max_downloads }}" \
+            --report asset-manager/reports/latest.json
+
+      - name: Upload dry-run report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playeconomy-asset-manager-dry-run-report
+          path: asset-manager/reports/latest.json
+          if-no-files-found: error
+          retention-days: 7
