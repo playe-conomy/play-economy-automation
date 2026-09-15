@@ -1,0 +1,53 @@
+name: PlayEconomy video V2
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_file:
+        description: Content definition to render
+        required: true
+        default: content/guitar-hero.json
+
+permissions:
+  contents: read
+
+jobs:
+  render-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CONTENT_FILE: ${{ inputs.content_file }}
+      OUTPUT_DIR: output
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install free rendering dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          ffmpeg -version
+          python -m pip install --upgrade pip
+          python -m pip install edge-tts
+
+      - name: Prepare local scenes and captions
+        run: node scripts/video/render-v2.mjs prepare "$CONTENT_FILE" "$OUTPUT_DIR"
+
+      - name: Generate Spanish narration with Edge TTS
+        run: edge-tts --voice es-CO-GonzaloNeural --file "$OUTPUT_DIR/narration.txt" --write-media "$OUTPUT_DIR/narration.mp3"
+
+      - name: Render vertical PlayEconomy video
+        run: node scripts/video/render-v2.mjs render "$CONTENT_FILE" "$OUTPUT_DIR"
+
+      - name: Upload proof video
+        uses: actions/upload-artifact@v4
+        with:
+          name: playeconomy-guitar-hero-v2
+          path: output/guitar-hero-v2.mp4
+          if-no-files-found: error
+          retention-days: 7
