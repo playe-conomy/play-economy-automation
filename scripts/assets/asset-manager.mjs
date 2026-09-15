@@ -16,12 +16,12 @@ const content = JSON.parse(await fs.readFile(contentPath, "utf8"));
 const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downloads"] ?? config.limits.maxDownloads), config.limits.maxDownloads), maxQueries: Math.min(Number(args["max-queries"] ?? config.limits.maxQueries), config.limits.maxQueries) };
 const manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
-const report = { manager: "PlayEconomy Asset Manager V3", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: manifest.assets.filter((asset) => asset.reusable && asset.status === "approved").length }, providers: {}, duplicates: 0, proposed_downloads: [], errors: [], fallback: "editorial_v2" };
+const report = { manager: "PlayEconomy Asset Manager V3.1", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: manifest.assets.filter((asset) => asset.reusable && asset.status === "approved").length }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], errors: [], fallback: "editorial_v2" };
 
 function queriesFromContent() {
   const supplied = content.visual_queries ?? [];
   const derived = supplied.length ? supplied : (content.asset_requirements ?? []).flatMap((item) => item.queries ?? []);
-  return derived.slice(0, limits.maxQueries).map((entry) => typeof entry === "string" ? { text: entry, kind: "contextual", primary: entry } : entry);
+  return derived.slice(0, limits.maxQueries).map((entry) => typeof entry === "string" ? { text: entry, intent: "contextual_broll", target_category: "Tecnología", primary: entry } : { ...entry, text: entry.query ?? entry.text, intent: entry.intent ?? entry.kind ?? "contextual_broll", target_entity: entry.target_entity ?? entry.franchise ?? entry.company ?? null, target_category: entry.target_category ?? entry.category ?? "Tecnología" });
 }
 
 async function request(url, provider) {
@@ -59,16 +59,33 @@ for (const query of queriesFromContent()) {
       stats.candidates += candidates.length;
       for (const candidate of candidates) {
         candidate.topic = content.id;
-        candidate.category = query.category ?? "Franquicias";
-        candidate.franchise = query.franchise ?? null;
-        candidate.company = query.company ?? null;
+        candidate.franchise = query.target_entity ?? null;
+        candidate.company = query.intent === "company" ? query.target_entity : null;
         const scored = scoreCandidate(candidate, query);
         const duplicate = findDuplicate(manifest, candidate);
-        if (duplicate) { report.duplicates += 1; stats.rejected += 1; continue; }
-        if (!scored.license.allowed || scored.score < config.scoring.minimumScore) { stats.rejected += 1; continue; }
+        const rejectionReasons = [];
+        if (duplicate) rejectionReasons.push("duplicate");
+        if (!candidate.sourceUrl || !candidate.downloadUrl) rejectionReasons.push("invalid_url");
+        if (!candidate.creator || !candidate.license || !candidate.licenseUrl) rejectionReasons.push("missing_metadata");
+        if (!scored.license.allowed) rejectionReasons.push(scored.license.reason === "license-not-reusable" ? "license_unknown" : "license_not_allowed");
+        if (scored.quality.tier === "low_resolution" || scored.quality.tier === "reject") rejectionReasons.push("insufficient_resolution");
+        if (!String(candidate.mimeType ?? "").startsWith("image/")) rejectionReasons.push("unsupported_mime");
+        if (scored.score < config.scoring.minimumScore) rejectionReasons.push("low_relevance");
+        if (rejectionReasons.length) {
+          stats.rejected += 1;
+          if (duplicate) report.duplicates += 1;
+          rejectionReasons.forEach((reason) => report.rejection_summary[reason] = (report.rejection_summary[reason] ?? 0) + 1);
+          report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, rejection_reasons: [...new Set(rejectionReasons)], quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, width: candidate.width, height: candidate.height } });
+          continue;
+        }
         if (report.proposed_downloads.length >= limits.maxDownloads) continue;
+        candidate.category = scored.classification.category;
+        candidate.franchise = scored.classification.role === "specific" || scored.classification.role === "gameplay" ? scored.classification.entity : null;
+        candidate.company = scored.classification.role === "company" ? scored.classification.entity : null;
+        const similar = report.proposed_downloads.filter((item) => item.asset_role === scored.classification.role && item.asset.category === candidate.category && item.query === query.text);
+        if (similar.length >= 2) { report.rejection_summary.diversity_limit = (report.rejection_summary.diversity_limit ?? 0) + 1; stats.rejected += 1; continue; }
         const record = assetRecord(candidate, { reusable: false, status: "candidate", drivePath: driveDestination(candidate) });
-        report.proposed_downloads.push({ query: query.text, score: scored.score, reasons: scored.reasons, asset: record });
+        report.proposed_downloads.push({ query: query.text, query_intent: query.intent, asset_role: scored.classification.role, classification_confidence: scored.classification.confidence, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, asset: record });
         stats.accepted += 1;
       }
     } catch (error) { stats.errors.push(error.message); report.errors.push(`${provider.name}: ${error.message}`); }

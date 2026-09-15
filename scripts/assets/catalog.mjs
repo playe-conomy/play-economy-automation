@@ -36,6 +36,32 @@ export function allowedLicense(candidate) {
   return { allowed: false, reason: "license-not-on-allowlist" };
 }
 
+export function qualityTier(candidate) {
+  const width = Number(candidate.width ?? 0);
+  const height = Number(candidate.height ?? 0);
+  const area = width * height;
+  if (!width || !height) return { tier: "reject", score: -25, reason: "missing_dimensions" };
+  if (width < 500 || height < 500 || area < 500000) return { tier: "low_resolution", score: -35, reason: "insufficient_resolution" };
+  if (area >= 2500000 && (width >= 1200 || height >= 1200)) return { tier: "high_quality", score: 25, reason: "high_quality" };
+  return { tier: "usable", score: 12, reason: "usable_resolution" };
+}
+
+export function classifyAsset(candidate, query) {
+  const text = `${candidate.title ?? ""} ${(candidate.tags ?? []).join(" ")} ${candidate.sourceUrl ?? ""}`.toLowerCase();
+  const target = (query.target_entity ?? query.primary ?? "").toLowerCase();
+  const related = target && text.includes(target);
+  const gameplayEvidence = /gameplay|screenshot|screen shot|in-game|in game/.test(text);
+  const companyEvidence = /activision|electronic arts|microsoft|sony|nintendo/.test(text);
+  const consoleEvidence = /playstation|xbox|nintendo|console|ps2|ps3|ps4/.test(text);
+  const technologyEvidence = /electric guitar|guitar|controller|peripheral|accessor/.test(text);
+  if (query.intent === "gameplay" && related && gameplayEvidence) return { role: "gameplay", category: "Gameplay", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "company" && (related || companyEvidence)) return { role: "company", category: "Empresas", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "console" && consoleEvidence) return { role: "console", category: "Consolas", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "specific" && related) return { role: "specific", category: "Franquicias", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "contextual_broll" || technologyEvidence) return { role: "contextual_broll", category: "Tecnología", entity: null, confidence: technologyEvidence ? "medium" : "low" };
+  return { role: "contextual_broll", category: query.target_category ?? "Tecnología", entity: null, confidence: "low" };
+}
+
 export function findDuplicate(manifest, candidate, checksum) {
   const normalizedUrl = normalizeSourceUrl(candidate.sourceUrl);
   return manifest.assets.find((asset) =>
@@ -49,22 +75,22 @@ export function scoreCandidate(candidate, query) {
   const terms = query.text.toLowerCase().split(/\s+/).filter((term) => term.length > 2);
   const matches = terms.filter((term) => text.includes(term)).length;
   const license = allowedLicense(candidate);
-  let score = matches * 12;
-  const reasons = [`relevance:${matches}/${terms.length}`];
-  if (candidate.width >= 1600 || candidate.height >= 1600) { score += 22; reasons.push("large-enough"); }
-  else if (candidate.width >= 1000 || candidate.height >= 1000) { score += 12; reasons.push("usable-resolution"); }
-  else { score -= 10; reasons.push("small-resolution"); }
-  if (["image/jpeg", "image/png", "image/webp"].includes(candidate.mimeType)) { score += 8; reasons.push("supported-image"); }
-  else { score -= 20; reasons.push("unsupported-type"); }
+  const classification = classifyAsset(candidate, query);
+  const quality = qualityTier(candidate);
+  const breakdown = { relevance: matches * 10, resolution: quality.score, license: 0, orientation: 0, specificity: 0, mime: 0 };
+  const reasons = [`relevance:${matches}/${terms.length}`, quality.reason];
+  if (["image/jpeg", "image/png", "image/webp"].includes(candidate.mimeType)) { breakdown.mime = 8; reasons.push("supported-image"); }
+  else { breakdown.mime = -20; reasons.push("unsupported_mime"); }
   if (candidate.width && candidate.height) {
     const ratio = candidate.height / candidate.width;
-    if (ratio >= 0.85) { score += 8; reasons.push("vertical-friendly"); }
-    else { score += 3; reasons.push("crop-pan-eligible"); }
+    if (ratio >= 0.85) { breakdown.orientation = 10; reasons.push("vertical-friendly"); }
+    else { breakdown.orientation = 4; reasons.push("crop-pan-eligible"); }
   }
-  if (license.allowed) { score += 30; reasons.push(license.reason); }
-  else { score -= 60; reasons.push(license.reason); }
-  if (query.kind === "specific" && text.includes(query.primary.toLowerCase())) { score += 15; reasons.push("specific-match"); }
-  return { score, reasons, license };
+  breakdown.license = license.allowed ? 25 : -60;
+  if (license.allowed) reasons.push(license.reason); else reasons.push(license.reason === "license-not-reusable" ? "license_unknown" : "license_not_allowed");
+  if (query.intent === "specific" && classification.role === "specific") { breakdown.specificity = 15; reasons.push("specific-match"); }
+  if (query.intent === "gameplay" && classification.role !== "gameplay") { breakdown.specificity = -18; reasons.push("gameplay_evidence_missing"); }
+  return { score: Object.values(breakdown).reduce((total, value) => total + value, 0), scoreBreakdown: breakdown, reasons, license, quality, classification };
 }
 
 export function sha256(buffer) {
