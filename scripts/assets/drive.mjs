@@ -40,10 +40,20 @@ export function resolveAssetDestination(assetRole, metadata = {}) {
   return { finalCategory, finalEntity, drivePath: `02_Biblioteca Visual/${finalCategory}/${suffix}` };
 }
 
-function driveError(code, response) {
+async function driveError(code, response) {
   const error = new Error(code);
   error.code = code;
   error.status = response?.status;
+  try {
+    const payload = await response?.json();
+    const detail = payload?.error;
+    error.details = {
+      reason: detail?.errors?.[0]?.reason ?? null,
+      message: detail?.message ?? null
+    };
+  } catch {
+    error.details = { reason: null, message: null };
+  }
   return error;
 }
 
@@ -53,7 +63,7 @@ function driveHeaders(accessToken, headers = {}) {
 
 async function driveJson(url, options, { accessToken, fetchImpl = fetch }) {
   const response = await fetchImpl(url, { ...options, headers: driveHeaders(accessToken, options.headers) });
-  if (!response.ok) throw driveError(`drive_http_${response.status}`, response);
+  if (!response.ok) throw await driveError(`drive_http_${response.status}`, response);
   return response.status === 204 ? null : response.json();
 }
 
@@ -86,14 +96,21 @@ export async function verifyDriveRoot(options = {}) {
   url.searchParams.set("fields", "id,name,mimeType");
   url.searchParams.set("supportsAllDrives", "true");
   const root = await driveJson(url, { method: "GET" }, options);
-  if (root.name !== "02_Biblioteca Visual" || root.mimeType !== FOLDER_MIME_TYPE) throw driveError("drive_root_mismatch");
+  if (root.name !== "02_Biblioteca Visual" || root.mimeType !== FOLDER_MIME_TYPE) throw await driveError("drive_root_mismatch");
   return root;
+}
+
+export async function driveAuthenticatedIdentity(options = {}) {
+  const url = new URL(`${DRIVE_API}/about`);
+  url.searchParams.set("fields", "user(emailAddress)");
+  const result = await driveJson(url, { method: "GET" }, options);
+  return result.user?.emailAddress ?? null;
 }
 
 export async function resolveDriveFolder(destination, options = {}) {
   const { rootFolderId = driveConfiguration().rootFolderId } = options;
   const categories = await listFolders(rootFolderId, destination.finalCategory, options);
-  if (!categories.length) throw driveError("drive_category_missing");
+  if (!categories.length) throw await driveError("drive_category_missing");
   const categoryFolder = categories[0];
   if (!destination.finalEntity) return { id: categoryFolder.id, path: `02_Biblioteca Visual/${destination.finalCategory}/` };
   const entities = await listFolders(categoryFolder.id, destination.finalEntity, options);
@@ -120,7 +137,7 @@ function multipartBody(metadata, bytes) {
 }
 
 export async function uploadToDrive(record, destination, options = {}) {
-  if (!options.accessToken) throw driveError("drive_not_configured");
+  if (!options.accessToken) throw await driveError("drive_not_configured");
   const duplicate = await findDriveDuplicate(record.checksum, options);
   if (duplicate) return { status: "duplicate", drive_file_id: duplicate.id, drive_folder_id: null, drive_path: null };
   const folder = await resolveDriveFolder(destination, options);

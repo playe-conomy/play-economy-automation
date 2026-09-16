@@ -40,6 +40,15 @@ await assert.rejects(
 assert.equal(writesAfterBadRoot, 0, "a root mismatch cannot create folders");
 
 await assert.rejects(
+  verifyDriveRoot({
+    accessToken: "test-token",
+    rootFolderId: rootId,
+    fetchImpl: async () => json({ error: { message: "File not found", errors: [{ reason: "notFound" }] } }, 404)
+  }),
+  (error) => error.code === "drive_http_404" && error.details.reason === "notFound" && error.details.message === "File not found"
+);
+
+await assert.rejects(
   resolveDriveFolder({ finalCategory: "Unknown", finalEntity: null }, {
     accessToken: "test-token",
     rootFolderId: rootId,
