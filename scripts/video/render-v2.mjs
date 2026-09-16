@@ -118,7 +118,14 @@ function prepare() {
   );
 
   const mediaFilters = [];
+  const hasSceneMedia = sceneMedia.assets.length > 0;
   let canvasInput = "[0:v]";
+  const [baseBackground, ...foregroundDraw] = draw;
+  if (hasSceneMedia) {
+    // Keep the legacy opaque background behind selected V4 scene media.
+    mediaFilters.push(`${canvasInput}${baseBackground}[scene_media_base]`);
+    canvasInput = "[scene_media_base]";
+  }
   for (const [index, scene] of definition.scenes.entries()) {
     const assetId = sceneMedia.scenes.get(scene.scene_id);
     if (!assetId) continue;
@@ -134,7 +141,7 @@ function prepare() {
 
   const graph = [
     ...mediaFilters,
-    `${canvasInput}${draw.join(",")}[canvas]`,
+    `${canvasInput}${(hasSceneMedia ? foregroundDraw : draw).join(",")}[canvas]`,
     "[1:v]scale=92:92,format=rgba[avatar]",
     "[2:v]scale=620:-1,format=rgba[logo]",
     "[canvas][avatar]overlay=72:78:enable='between(t,0,22.9)'[with_avatar]",
