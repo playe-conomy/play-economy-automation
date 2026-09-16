@@ -13,6 +13,7 @@
         "properties": {
           "id": {"type": "string"},
           "filename": {"type": ["string", "null"]},
+          "title": {"type": ["string", "null"]},
           "type": {"enum": ["image", "video", "audio", "graphic"]},
           "category": {"type": ["string", "null"]},
           "asset_role": {"type": ["string", "null"]},
