@@ -39,6 +39,14 @@ Critical metadata is `source`, `source_url`, `title`, and `license`. Missing cri
 
 High-quality images receive a larger resolution advantage than usable images so portrait orientation cannot offset a materially lower resolution. The existing low-resolution and reject thresholds remain unchanged.
 
+## V3.2 controlled cache downloads
+
+Eligible candidates are collected after blocking checks, sorted by total score descending, and only then passed through the existing diversity limit. This ensures higher-quality similar assets are selected before lower-scoring alternatives.
+
+With `dry_run=true`, no download function is called. With `dry_run=false`, selected images are downloaded only to `.cache/assets/`, with bounded retries, a 10-second request timeout, a 15 MB limit, supported JPEG/PNG/WEBP content type and signature checks, deterministic filenames, SHA-256, and duplicate checks against both the manifest and the current run. Failures are recorded without stopping remaining candidates.
+
+The report exposes download counts and per-asset status, structured error, checksum, cache path and bytes. Successful records use `status: downloaded` and preserve asset role, final category/entity and future Drive path. Drive configuration and uploads remain disabled. The non-dry artifact includes `latest.json`, `manifest.json`, and `.cache/assets/` for review.
+
 ## Limits and failures
 
 `asset-manager/config.json` caps queries (8), results per query (4), downloads (5), retries (2), per-request timeout (10 seconds), global work (4 minutes), and file size (15 MB). 429 and 5xx replies receive at most two exponential-backoff retries. Any provider error is logged and the other provider continues. There are no unbounded loops.
