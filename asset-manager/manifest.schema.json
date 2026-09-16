@@ -29,7 +29,11 @@
           "checksum": {"type": ["string", "null"]},
           "drive_path": {"type": ["string", "null"]},
           "drive_file_id": {"type": ["string", "null"]},
-          "status": {"enum": ["candidate", "downloaded", "approved", "rejected", "duplicate", "error"]}
+          "drive_folder_id": {"type": ["string", "null"]},
+          "upload_status": {"type": ["string", "null"]},
+          "upload_date": {"type": ["string", "null"]},
+          "upload_error": {"type": ["string", "null"]},
+          "status": {"enum": ["candidate", "downloaded", "uploaded", "approved", "rejected", "duplicate", "error"]}
         }
       }
     }
