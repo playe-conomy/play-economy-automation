@@ -101,8 +101,8 @@ export async function resolveDriveFolder(destination, options = {}) {
   return { id: entityFolder.id, path: `02_Biblioteca Visual/${destination.finalCategory}/${destination.finalEntity}/` };
 }
 
-async function findDriveDuplicate(folderId, checksum, options) {
-  const query = `'${escapedQueryValue(folderId)}' in parents and appProperties has { key='playeconomy_sha256' and value='${escapedQueryValue(checksum)}' } and trashed = false`;
+async function findDriveDuplicate(checksum, options) {
+  const query = `appProperties has { key='playeconomy_sha256' and value='${escapedQueryValue(checksum)}' } and trashed = false`;
   const url = new URL(`${DRIVE_API}/files`);
   url.searchParams.set("q", query);
   url.searchParams.set("fields", "files(id,name)");
@@ -121,9 +121,9 @@ function multipartBody(metadata, bytes) {
 
 export async function uploadToDrive(record, destination, options = {}) {
   if (!options.accessToken) throw driveError("drive_not_configured");
+  const duplicate = await findDriveDuplicate(record.checksum, options);
+  if (duplicate) return { status: "duplicate", drive_file_id: duplicate.id, drive_folder_id: null, drive_path: null };
   const folder = await resolveDriveFolder(destination, options);
-  const duplicate = await findDriveDuplicate(folder.id, record.checksum, options);
-  if (duplicate) return { status: "duplicate", drive_file_id: duplicate.id, drive_folder_id: folder.id, drive_path: folder.path };
   const bytes = await fs.readFile(record.local_cache_path);
   const metadata = { name: record.filename, mimeType: record.mime_type, parents: [folder.id], appProperties: { playeconomy_sha256: record.checksum } };
   const { boundary, body } = multipartBody(metadata, bytes);

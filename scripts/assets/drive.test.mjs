@@ -70,6 +70,8 @@ try {
   });
   assert.equal(upload.status, "uploaded");
   assert.equal(upload.drive_file_id, "file-id");
+  const checksumLookup = uploadRequests.find((request) => decodeURIComponent(request.address).includes("playeconomy_sha256"));
+  assert.doesNotMatch(decodeURIComponent(checksumLookup.address), /in parents/);
   const uploadRequest = uploadRequests.find((request) => request.address.includes("upload/drive"));
   assert.match(String(uploadRequest.options.body), /playeconomy_sha256/);
   assert.match(String(uploadRequest.options.body), /technology-id/);
