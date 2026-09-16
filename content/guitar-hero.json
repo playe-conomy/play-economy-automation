@@ -5,11 +5,11 @@
   "tagline": "El negocio detrás de los videojuegos.",
   "narration": "Guitar Hero convirtió una guitarra de plástico en uno de los negocios más grandes del gaming. La franquicia explotó: juegos nuevos, guitarras, baterías y accesorios por todas partes. Activision aprovechó el fenómeno, pero tantos lanzamientos saturaron el mercado. Las ventas cayeron. Guitar Hero demuestra que incluso un fenómeno millonario puede desaparecer cuando el mercado se satura.",
   "scenes": [
-    {"start": 0, "end": 5, "eyebrow": "EL FENÓMENO", "headline": ["PLÁSTICO", "CONVERTIDO", "EN ORO"], "metric": "GUITAR HERO", "caption": "Una guitarra de plástico se volvió negocio."},
-    {"start": 5, "end": 10, "eyebrow": "LA EXPLOSIÓN", "headline": ["JUEGOS +", "GUITARRAS +", "BATERÍAS"], "metric": "TODO CRECÍA", "caption": "Juegos, accesorios y más lanzamientos."},
-    {"start": 10, "end": 15, "eyebrow": "LA ESCALA", "headline": ["ACTIVISION", "APROVECHÓ", "EL MOMENTO"], "metric": "FRANQUICIA", "caption": "El éxito parecía no tener techo."},
-    {"start": 15, "end": 21, "eyebrow": "EL GIRO", "headline": ["EL MERCADO", "SE", "SATURÓ"], "metric": "DEMASIADOS TÍTULOS", "caption": "El ritmo de lanzamientos agotó la demanda."},
-    {"start": 21, "end": 27, "eyebrow": "LA LECCIÓN", "headline": ["UN ÉXITO", "TAMBIÉN", "PUEDE CAER"], "metric": "VENTAS A LA BAJA", "caption": "Incluso un fenómeno millonario puede desaparecer."}
+    {"scene_id": "guitar-hero-identity", "start": 0, "end": 5, "eyebrow": "EL FENÓMENO", "headline": ["PLÁSTICO", "CONVERTIDO", "EN ORO"], "metric": "GUITAR HERO", "caption": "Una guitarra de plástico se volvió negocio.", "visual_intent": "franchise_identity", "target_entity": "Guitar Hero", "preferred_roles": ["cover_art", "official_art", "specific"]},
+    {"scene_id": "guitar-hero-gameplay", "start": 5, "end": 10, "eyebrow": "LA EXPLOSIÓN", "headline": ["JUEGOS +", "GUITARRAS +", "BATERÍAS"], "metric": "TODO CRECÍA", "caption": "Juegos, accesorios y más lanzamientos.", "visual_intent": "gameplay", "target_entity": "Guitar Hero", "preferred_roles": ["gameplay", "specific", "official_art"]},
+    {"scene_id": "activision-business", "start": 10, "end": 15, "eyebrow": "LA ESCALA", "headline": ["ACTIVISION", "APROVECHÓ", "EL MOMENTO"], "metric": "FRANQUICIA", "caption": "El éxito parecía no tener techo.", "visual_intent": "company_context", "target_entity": "Activision", "preferred_roles": ["company"]},
+    {"scene_id": "rock-culture", "start": 15, "end": 21, "eyebrow": "EL GIRO", "headline": ["EL MERCADO", "SE", "SATURÓ"], "metric": "DEMASIADOS TÍTULOS", "caption": "El ritmo de lanzamientos agotó la demanda.", "visual_intent": "rock_music_context", "target_entity": null, "preferred_roles": ["contextual_broll", "technology"]},
+    {"scene_id": "guitar-hero-conclusion", "start": 21, "end": 27, "eyebrow": "LA LECCIÓN", "headline": ["UN ÉXITO", "TAMBIÉN", "PUEDE CAER"], "metric": "VENTAS A LA BAJA", "caption": "Incluso un fenómeno millonario puede desaparecer.", "visual_intent": "franchise_conclusion", "target_entity": "Guitar Hero", "preferred_roles": ["official_art", "cover_art", "specific"]}
   ],
   "entities": {
     "franchises": ["Guitar Hero"],
