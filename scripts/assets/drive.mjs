@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 
-const DRIVE_API = "https://www.googleapis.com/drive/v3";
-const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files";
+export const DRIVE_API = "https://www.googleapis.com/drive/v3";
+export const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files";
 const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 
 export function driveConfiguration() {
@@ -44,7 +44,7 @@ export function resolveAssetDestination(assetRole, metadata = {}) {
   return { finalCategory, finalEntity, drivePath: `02_Biblioteca Visual/${finalCategory}/${suffix}` };
 }
 
-async function driveError(code, response) {
+export async function driveError(code, response) {
   const error = new Error(code);
   error.code = code;
   error.status = response?.status;
@@ -61,11 +61,11 @@ async function driveError(code, response) {
   return error;
 }
 
-function driveHeaders(accessToken, headers = {}) {
+export function driveHeaders(accessToken, headers = {}) {
   return { Authorization: `Bearer ${accessToken}`, ...headers };
 }
 
-async function driveJson(url, options, { accessToken, fetchImpl = fetch, operation = "drive_request", targetFolderId = null, targetPath = null }) {
+export async function driveJsonResponse(url, options, { accessToken, fetchImpl = fetch, operation = "drive_request", targetFolderId = null, targetPath = null }) {
   const response = await fetchImpl(url, { ...options, headers: driveHeaders(accessToken, options.headers) });
   if (!response.ok) {
     const error = await driveError(`drive_http_${response.status}`, response);
@@ -74,7 +74,14 @@ async function driveJson(url, options, { accessToken, fetchImpl = fetch, operati
     error.target_path = targetPath;
     throw error;
   }
-  return response.status === 204 ? null : response.json();
+  return {
+    data: response.status === 204 ? null : await response.json(),
+    etag: response.headers.get("etag")
+  };
+}
+
+export async function driveJson(url, options, context) {
+  return (await driveJsonResponse(url, options, context)).data;
 }
 
 function escapedQueryValue(value) {
@@ -164,3 +171,4 @@ export async function uploadToDrive(record, destination, options = {}) {
   const file = await driveJson(url, { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body }, { ...options, operation: "file_upload", targetFolderId: folder.id, targetPath: folder.path });
   return { status: "uploaded", drive_file_id: file.id, drive_folder_id: folder.id, drive_path: folder.path };
 }
+
