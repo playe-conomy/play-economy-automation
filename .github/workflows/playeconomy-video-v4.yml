@@ -1,0 +1,109 @@
+name: PlayEconomy video V4
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_file:
+        description: Content definition to render from the persistent visual catalog
+        required: true
+        default: content/guitar-hero.json
+
+permissions:
+  contents: read
+
+jobs:
+  render-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CONTENT_FILE: ${{ inputs.content_file }}
+      OUTPUT_DIR: output
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install free rendering dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          ffmpeg -version
+          ffprobe -version
+          python -m pip install --upgrade pip
+          python -m pip install edge-tts
+
+      - name: Verify Google Drive OAuth secrets
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+        run: |
+          missing=()
+          [[ -n "$GOOGLE_DRIVE_CLIENT_ID" ]] || missing+=(GOOGLE_DRIVE_CLIENT_ID)
+          [[ -n "$GOOGLE_DRIVE_CLIENT_SECRET" ]] || missing+=(GOOGLE_DRIVE_CLIENT_SECRET)
+          [[ -n "$GOOGLE_DRIVE_REFRESH_TOKEN" ]] || missing+=(GOOGLE_DRIVE_REFRESH_TOKEN)
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing required Google Drive OAuth secret(s): ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Exchange Google Drive OAuth refresh token
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          curl --fail --silent --show-error --request POST "https://oauth2.googleapis.com/token" \
+            --header "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "client_id=$GOOGLE_DRIVE_CLIENT_ID" \
+            --data-urlencode "client_secret=$GOOGLE_DRIVE_CLIENT_SECRET" \
+            --data-urlencode "refresh_token=$GOOGLE_DRIVE_REFRESH_TOKEN" \
+            --data-urlencode "grant_type=refresh_token" \
+            --output "$response_file"
+          access_token="$(node -e 'const fs = require("fs"); let response; try { response = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { process.exit(1); } if (typeof response.access_token !== "string" || !response.access_token) process.exit(1); process.stdout.write(response.access_token);' "$response_file")" || {
+            echo "::error::Google Drive OAuth token exchange returned no access token"
+            exit 1
+          }
+          echo "::add-mask::$access_token"
+          printf 'GOOGLE_DRIVE_ACCESS_TOKEN=%s\n' "$access_token" >> "$GITHUB_ENV"
+
+      - name: Hydrate persistent Drive catalog
+        run: node scripts/assets/fetch-scene-media.mjs --mode hydrate --manifest asset-manager/manifest.json --report "$OUTPUT_DIR/catalog-hydration.json"
+
+      - name: Map catalog assets to scenes
+        run: node scripts/assets/scene-mapper.mjs --content "$CONTENT_FILE" --manifest asset-manager/manifest.json --output "$OUTPUT_DIR/scene-plan.json"
+
+      - name: Fetch selected scene media
+        run: node scripts/assets/fetch-scene-media.mjs --mode fetch --scene-plan "$OUTPUT_DIR/scene-plan.json" --manifest asset-manager/manifest.json --output-dir "$OUTPUT_DIR" --report "$OUTPUT_DIR/scene-media-report.json"
+
+      - name: Prepare local scenes and captions
+        run: node scripts/video/render-v2.mjs prepare "$CONTENT_FILE" "$OUTPUT_DIR" "$OUTPUT_DIR/scene-media.json"
+
+      - name: Generate Spanish narration with Edge TTS
+        run: edge-tts --voice es-CO-GonzaloNeural --file "$OUTPUT_DIR/narration.txt" --write-media "$OUTPUT_DIR/narration.mp3"
+
+      - name: Render vertical PlayEconomy video
+        run: node scripts/video/render-v2.mjs render "$CONTENT_FILE" "$OUTPUT_DIR" "$OUTPUT_DIR/scene-media.json"
+
+      - name: Upload V4 review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playeconomy-video-v4-review
+          path: |
+            output/*.mp4
+            output/scene-plan.json
+            output/scene-media.json
+            output/scene-media-report.json
+            output/catalog-hydration.json
+            output/ATTRIBUTION.md
+          if-no-files-found: error
+          retention-days: 7
+

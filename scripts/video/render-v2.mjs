@@ -1,8 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const [mode, definitionPath, outputPath = "output"] = process.argv.slice(2);
+const [mode, definitionPath, outputPath = "output", sceneMediaPath] = process.argv.slice(2);
 
 if (!mode || !definitionPath || !["prepare", "render"].includes(mode)) {
   throw new Error("Usage: node scripts/video/render-v2.mjs <prepare|render> <content.json> [output-dir]");
@@ -17,6 +17,24 @@ const logoPath = resolve("assets/brand/playeconomy-logo.png");
 const avatarPath = resolve("assets/brand/playeconomy-avatar.jpeg");
 
 mkdirSync(outputDir, { recursive: true });
+
+function sceneMediaInputs() {
+  if (!sceneMediaPath) return { scenes: new Map(), assets: [] };
+  const sceneMedia = JSON.parse(readFileSync(sceneMediaPath, "utf8"));
+  const assets = new Map();
+  const scenes = new Map();
+  for (const [sceneId, entry] of Object.entries(sceneMedia.scenes ?? {})) {
+    if (entry?.media_type !== "image") throw new Error(`Unsupported scene media type for ${sceneId}`);
+    if (!entry.asset_id || !entry.local_path) throw new Error(`Invalid scene media entry for ${sceneId}`);
+    const path = resolve(entry.local_path);
+    if (!existsSync(path)) throw new Error(`Scene media file missing for ${sceneId}`);
+    const existing = assets.get(entry.asset_id);
+    if (existing && existing.path !== path) throw new Error(`Conflicting scene media path for ${entry.asset_id}`);
+    assets.set(entry.asset_id, { asset_id: entry.asset_id, path });
+    scenes.set(sceneId, entry.asset_id);
+  }
+  return { scenes, assets: [...assets.values()].sort((left, right) => left.asset_id.localeCompare(right.asset_id)) };
+}
 
 function escapeAss(value) {
   return value.replaceAll("\\", "\\\\").replaceAll("{", "\\{").replaceAll("}", "\\}").replaceAll("\n", "\\N");
@@ -40,6 +58,7 @@ function escapeFilter(value) {
 }
 
 function prepare() {
+  const sceneMedia = sceneMediaInputs();
   writeFileSync(resolve(outputDir, "narration.txt"), `${definition.narration}\n`, "utf8");
 
   const assLines = [
@@ -98,8 +117,24 @@ function prepare() {
     `subtitles=${resolve(outputDir, "captions.ass").replaceAll("\\", "/")}:fontsdir=/usr/share/fonts/truetype/dejavu`
   );
 
+  const mediaFilters = [];
+  let canvasInput = "[0:v]";
+  for (const [index, scene] of definition.scenes.entries()) {
+    const assetId = sceneMedia.scenes.get(scene.scene_id);
+    if (!assetId) continue;
+    const inputIndex = 3 + sceneMedia.assets.findIndex((asset) => asset.asset_id === assetId);
+    const mediaLabel = `scene_media_${index}`;
+    const compositeLabel = `scene_canvas_${index}`;
+    mediaFilters.push(
+      `[${inputIndex}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[${mediaLabel}]`,
+      `${canvasInput}[${mediaLabel}]overlay=0:0:enable='between(t\\,${scene.start}\\,${scene.end})'[${compositeLabel}]`
+    );
+    canvasInput = `[${compositeLabel}]`;
+  }
+
   const graph = [
-    `[0:v]${draw.join(",")}[canvas]`,
+    ...mediaFilters,
+    `${canvasInput}${draw.join(",")}[canvas]`,
     "[1:v]scale=92:92,format=rgba[avatar]",
     "[2:v]scale=620:-1,format=rgba[logo]",
     "[canvas][avatar]overlay=72:78:enable='between(t,0,22.9)'[with_avatar]",
@@ -109,6 +144,7 @@ function prepare() {
 }
 
 function render() {
+  const sceneMedia = sceneMediaInputs();
   const audioPath = resolve(outputDir, "narration.mp3");
   const videoPath = resolve(outputDir, `${definition.id}.mp4`);
   const command = [
@@ -116,9 +152,10 @@ function render() {
     "-f", "lavfi", "-i", `color=c=0x07121F:s=1080x1920:r=30:d=${duration}`,
     "-loop", "1", "-framerate", "30", "-i", avatarPath,
     "-loop", "1", "-framerate", "30", "-i", logoPath,
+    ...sceneMedia.assets.flatMap((asset) => ["-loop", "1", "-framerate", "30", "-i", asset.path]),
     "-i", audioPath,
     "-filter_complex_script", resolve(outputDir, "filtergraph.txt"),
-    "-map", "[v]", "-map", "3:a",
+    "-map", "[v]", "-map", `${3 + sceneMedia.assets.length}:a`,
     "-t", String(duration),
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
     "-c:a", "aac", "-b:a", "128k", "-af", `apad=pad_dur=${duration}`,
@@ -132,3 +169,4 @@ if (mode === "prepare") prepare();
 if (mode === "render") render();
 
 console.log(`${mode}: ${basename(definitionPath)}`);
+
