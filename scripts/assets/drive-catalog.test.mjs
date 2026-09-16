@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildScenePlan } from "./scene-mapper.mjs";
-import { buildCatalog, hydrateDriveCatalog, persistDriveCatalog, validateCatalog } from "./drive-catalog.mjs";
+import { assertBootstrapSafetyGate, buildCatalog, hydrateDriveCatalog, persistBootstrapOnly, persistDriveCatalog, prepareBootstrapOnly, validateCatalog } from "./drive-catalog.mjs";
 
 const rootFolderId = "root-id";
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
@@ -102,6 +102,77 @@ try {
   assert.equal(rejectedBootstrap.bootstrap.skipped, 1, "mismatched historical assets are rejected");
 } finally {
   await rm(bootstrapDir, { recursive: true, force: true });
+}
+
+const bootstrapOnlyDir = await mkdtemp(join(tmpdir(), "playeconomy-bootstrap-only-"));
+try {
+  const bootstrapAssets = ["one", "two", "three", "four", "five"].map((id, index) => asset(id, { total_score: 145 + index, semantic_relevance: { score: 50 + index, passed: true } }));
+  const bootstrapPath = join(bootstrapOnlyDir, "valid.json");
+  await writeFile(bootstrapPath, JSON.stringify({ version: 1, assets: bootstrapAssets }));
+  const bootstrapFiles = new Map(bootstrapAssets.map((entry) => [entry.drive_file_id, { id: entry.drive_file_id, appProperties: { playeconomy_sha256: entry.checksum } }]));
+  let createRequests = 0;
+  const successfulFetch = catalogFetch({
+    bootstrapFiles,
+    contents: new Map([["catalog-file", catalog(bootstrapAssets, { catalog_version: 1 })]]),
+    onRequest: (_address, options) => { if (options.method === "POST") createRequests += 1; }
+  });
+  const prepared = await prepareBootstrapOnly({ accessToken: "test-token", rootFolderId, bootstrapManifestPath: bootstrapPath, fetchImpl: successfulFetch });
+  assert.deepEqual({ imported: prepared.bootstrap.imported, skipped: prepared.bootstrap.skipped, conflicts: prepared.bootstrap.conflicts.length }, { imported: 5, skipped: 0, conflicts: 0 });
+  const persistedBootstrap = await persistBootstrapOnly(prepared, 5, { accessToken: "test-token", rootFolderId, fetchImpl: successfulFetch });
+  assert.equal(persistedBootstrap.created, true, "a valid five-asset bootstrap creates the catalog once");
+  assert.equal(persistedBootstrap.readback_validation, "passed", "created catalog is read and validated independently");
+  assert.equal(createRequests, 1);
+
+  await assert.rejects(
+    persistBootstrapOnly(prepared, 4, { accessToken: "test-token", rootFolderId, fetchImpl: successfulFetch }),
+    { code: "bootstrap_safety_gate_failed" },
+    "a count different from expected blocks catalog creation"
+  );
+  assert.throws(() => assertBootstrapSafetyGate({ imported: 5, skipped: 1, conflicts: [] }, 5), { code: "bootstrap_safety_gate_failed" }, "skipped bootstrap assets block creation");
+  assert.throws(() => assertBootstrapSafetyGate({ imported: 5, skipped: 0, conflicts: [{ code: "sha256_mismatch" }] }, 5), { code: "bootstrap_safety_gate_failed" }, "conflicts block creation");
+
+  const mismatchPrepared = await prepareBootstrapOnly({
+    accessToken: "test-token",
+    rootFolderId,
+    bootstrapManifestPath: bootstrapPath,
+    fetchImpl: catalogFetch({ bootstrapFiles: new Map([[bootstrapAssets[0].drive_file_id, { id: bootstrapAssets[0].drive_file_id, appProperties: { playeconomy_sha256: "wrong" } }]]) })
+  });
+  assert.ok(mismatchPrepared.bootstrap.conflicts.some((conflict) => conflict.code === "sha256_mismatch"), "SHA mismatches are reported");
+  assert.equal(mismatchPrepared.session, null, "SHA mismatches cannot produce a persistable session");
+
+  const missingPropertyPrepared = await prepareBootstrapOnly({
+    accessToken: "test-token",
+    rootFolderId,
+    bootstrapManifestPath: bootstrapPath,
+    fetchImpl: catalogFetch({ bootstrapFiles: new Map(bootstrapAssets.map((entry) => [entry.drive_file_id, { id: entry.drive_file_id, appProperties: {} }])) })
+  });
+  assert.ok(missingPropertyPrepared.bootstrap.conflicts.some((conflict) => conflict.code === "missing_playeconomy_sha256"), "missing Drive SHA metadata is reported");
+
+  const duplicatePath = join(bootstrapOnlyDir, "duplicate.json");
+  await writeFile(duplicatePath, JSON.stringify({ version: 1, assets: [bootstrapAssets[0], { ...bootstrapAssets[1], id: bootstrapAssets[0].id }] }));
+  const duplicatePrepared = await prepareBootstrapOnly({ accessToken: "test-token", rootFolderId, bootstrapManifestPath: duplicatePath, fetchImpl: catalogFetch({ bootstrapFiles }) });
+  assert.ok(duplicatePrepared.bootstrap.conflicts.some((conflict) => conflict.code === "duplicate_asset_id"), "duplicate IDs are reported before creation");
+
+  let overwriteRequests = 0;
+  const existingPrepared = await prepareBootstrapOnly({
+    accessToken: "test-token",
+    rootFolderId,
+    bootstrapManifestPath: bootstrapPath,
+    fetchImpl: catalogFetch({ files: [{ id: "existing-catalog", version: "1" }], contents: new Map([["existing-catalog", catalog([bootstrapAssets[0]])]]), onRequest: (_address, options) => { if (["POST", "PATCH"].includes(options.method)) overwriteRequests += 1; } })
+  });
+  assert.equal(existingPrepared.catalogPreviouslyExisted, true, "an existing catalog is detected before bootstrap verification or writes");
+  assert.equal(overwriteRequests, 0, "existing catalogs are never overwritten by bootstrap preparation");
+
+  let failedReadbackCreates = 0;
+  const readbackFailurePrepared = await prepareBootstrapOnly({ accessToken: "test-token", rootFolderId, bootstrapManifestPath: bootstrapPath, fetchImpl: catalogFetch({ bootstrapFiles, contents: new Map([["catalog-file", { invalid: true }]]), onRequest: (_address, options) => { if (options.method === "POST") failedReadbackCreates += 1; } }) });
+  await assert.rejects(
+    persistBootstrapOnly(readbackFailurePrepared, 5, { accessToken: "test-token", rootFolderId, fetchImpl: catalogFetch({ bootstrapFiles, contents: new Map([["catalog-file", { invalid: true }]]), onRequest: (_address, options) => { if (options.method === "POST") failedReadbackCreates += 1; } }) }),
+    { code: "catalog_unsupported_schema_version" },
+    "read-back failures are surfaced rather than repaired"
+  );
+  assert.equal(failedReadbackCreates, 1, "read-back failures do not trigger a repair write");
+} finally {
+  await rm(bootstrapOnlyDir, { recursive: true, force: true });
 }
 
 let patchAttempted = false;

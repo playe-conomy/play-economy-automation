@@ -2,7 +2,7 @@ import { mkdirSync, promises as fs } from "node:fs";
 import { basename, resolve } from "node:path";
 import { assetRecord, findDuplicate, inspectMetadata, loadManifest, saveManifest, scoreCandidate } from "./catalog.mjs";
 import { driveAuthenticatedIdentity, driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
-import { hydrateDriveCatalog, persistDriveCatalog } from "./drive-catalog.mjs";
+import { hydrateDriveCatalog, persistDriveCatalog, persistBootstrapOnly, prepareBootstrapOnly } from "./drive-catalog.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
@@ -14,24 +14,43 @@ const configPath = resolve(args.config ?? "asset-manager/config.json");
 const manifestPath = resolve(args.manifest ?? "asset-manager/manifest.json");
 const reportPath = resolve(args.report ?? "asset-manager/reports/latest.json");
 const dryRun = String(args["dry-run"] ?? "true") !== "false";
+const bootstrapOnly = String(args["bootstrap-only"] ?? "false") === "true";
+const expectedBootstrapAssets = args["expected-bootstrap-assets"] === undefined || args["expected-bootstrap-assets"] === "" ? null : Number(args["expected-bootstrap-assets"]);
 const config = JSON.parse(await fs.readFile(configPath, "utf8"));
 const content = JSON.parse(await fs.readFile(contentPath, "utf8"));
 const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downloads"] ?? config.limits.maxDownloads), config.limits.maxDownloads), maxQueries: Math.min(Number(args["max-queries"] ?? config.limits.maxQueries), config.limits.maxQueries) };
 let manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
 const drive = driveConfiguration();
-const report = { manager: "PlayEconomy Asset Manager V3.6", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, errors: [], fallback: "editorial_v2" };
+const report = { manager: "PlayEconomy Asset Manager V3.6.1", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, bootstrap: { bootstrap_only: bootstrapOnly, expected_assets: expectedBootstrapAssets, imported: 0, skipped: 0, conflicts: 0, conflict_details: [], catalog_previously_existed: false, catalog_created: false, catalog_drive_file_id: null, readback_validation: "not_requested", persistent_asset_count: 0, discovery_executed: false, downloads_executed: false, uploads_executed: false }, errors: [], fallback: "editorial_v2" };
 let driveReady = false;
 let catalogSession = null;
+
+async function writeReport() {
+  report.finished_at = new Date().toISOString();
+  mkdirSync(resolve(reportPath, ".."), { recursive: true });
+  await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+}
 
 async function failCatalog(error) {
   report.catalog.hydration_status = "failed";
   report.catalog.error = error.code ?? error.message;
   report.errors.push(`Drive catalog: ${report.catalog.error}`);
-  report.finished_at = new Date().toISOString();
-  mkdirSync(resolve(reportPath, ".."), { recursive: true });
-  await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  await writeReport();
   throw error;
+}
+
+async function failBootstrap(error) {
+  report.catalog.hydration_status = "failed";
+  report.bootstrap.error = error.code ?? error.message;
+  report.errors.push(`Bootstrap: ${report.bootstrap.error}`);
+  await writeReport();
+  throw error;
+}
+
+if (bootstrapOnly && (dryRun || !args["bootstrap-manifest"] || !Number.isInteger(expectedBootstrapAssets) || expectedBootstrapAssets < 1)) {
+  const code = dryRun ? "bootstrap_only_requires_dry_run_false" : !args["bootstrap-manifest"] ? "bootstrap_only_requires_bootstrap_manifest" : "bootstrap_only_requires_expected_assets";
+  await failBootstrap(Object.assign(new Error(code), { code }));
 }
 
 if (drive.configured) {
@@ -51,31 +70,81 @@ if (drive.configured) {
     report.drive.root_verification_error = error.code ?? error.message;
     report.drive.root_verification_reason = error.details?.reason ?? null;
     report.drive.root_verification_message = error.details?.message ?? null;
-    await failCatalog(error);
+    await (bootstrapOnly ? failBootstrap(error) : failCatalog(error));
   }
-  try {
-    catalogSession = await hydrateDriveCatalog({
-      accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN,
-      rootFolderId: drive.rootFolderId,
-      bootstrapManifestPath: args["bootstrap-manifest"] ? resolve(args["bootstrap-manifest"]) : null
-    });
-    manifest = catalogSession.manifest;
-    report.catalog = {
-      ...report.catalog,
-      hydration_status: catalogSession.hydration.status,
-      drive_file_id: catalogSession.fileId,
-      schema_version: catalogSession.catalog.schema_version,
-      hydrated_assets: catalogSession.hydration.asset_count,
-      bootstrap: catalogSession.bootstrap,
-      final_persistent_asset_count: manifest.assets.length
-    };
-  } catch (error) {
-    await failCatalog(error);
+  if (bootstrapOnly) {
+    try {
+      const prepared = await prepareBootstrapOnly({
+        accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN,
+        rootFolderId: drive.rootFolderId,
+        bootstrapManifestPath: resolve(args["bootstrap-manifest"])
+      });
+      report.bootstrap.catalog_previously_existed = prepared.catalogPreviouslyExisted;
+      report.bootstrap.imported = prepared.bootstrap.imported;
+      report.bootstrap.skipped = prepared.bootstrap.skipped;
+      report.bootstrap.conflicts = prepared.bootstrap.conflicts.length;
+      report.bootstrap.conflict_details = prepared.bootstrap.conflicts;
+      report.catalog.hydration_status = prepared.catalogPreviouslyExisted ? "catalog_already_exists" : "bootstrap_prepared";
+      report.catalog.drive_file_id = prepared.fileId;
+      report.catalog.schema_version = prepared.catalog?.schema_version ?? null;
+      if (prepared.catalogPreviouslyExisted) {
+        report.bootstrap.persistent_asset_count = prepared.manifest.assets.length;
+        report.catalog.final_persistent_asset_count = prepared.manifest.assets.length;
+      } else {
+        const persisted = await persistBootstrapOnly(prepared, expectedBootstrapAssets, {
+          accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN,
+          rootFolderId: drive.rootFolderId,
+          requireImageMediaType: true
+        });
+        manifest = { version: persisted.catalog.manifest_version, assets: persisted.catalog.assets };
+        report.bootstrap.catalog_created = persisted.created;
+        report.bootstrap.catalog_drive_file_id = persisted.fileId;
+        report.bootstrap.readback_validation = persisted.readback_validation;
+        report.bootstrap.persistent_asset_count = persisted.catalog.assets.length;
+        report.catalog.hydration_status = "bootstrap_completed";
+        report.catalog.drive_file_id = persisted.fileId;
+        report.catalog.schema_version = persisted.catalog.schema_version;
+        report.catalog.final_persistent_asset_count = persisted.catalog.assets.length;
+        await saveManifest(manifestPath, manifest);
+      }
+      await writeReport();
+    } catch (error) {
+      if (error.bootstrap_readback_validation) {
+        report.bootstrap.readback_validation = error.bootstrap_readback_validation;
+        report.bootstrap.catalog_drive_file_id = error.bootstrap_catalog_file_id ?? null;
+        report.bootstrap.catalog_created = Boolean(error.bootstrap_catalog_created);
+      }
+      await failBootstrap(error);
+    }
+  } else {
+    try {
+      catalogSession = await hydrateDriveCatalog({
+        accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN,
+        rootFolderId: drive.rootFolderId,
+        bootstrapManifestPath: args["bootstrap-manifest"] ? resolve(args["bootstrap-manifest"]) : null
+      });
+      manifest = catalogSession.manifest;
+      report.catalog = {
+        ...report.catalog,
+        hydration_status: catalogSession.hydration.status,
+        drive_file_id: catalogSession.fileId,
+        schema_version: catalogSession.catalog.schema_version,
+        hydrated_assets: catalogSession.hydration.asset_count,
+        bootstrap: catalogSession.bootstrap,
+        final_persistent_asset_count: manifest.assets.length
+      };
+    } catch (error) {
+      await failCatalog(error);
+    }
   }
 } else if (!dryRun) {
   report.drive.root_verification = "not_configured";
   report.catalog.hydration_status = "not_configured";
 }
+if (bootstrapOnly && !drive.configured) {
+  await failBootstrap(Object.assign(new Error("bootstrap_only_requires_drive_oauth"), { code: "bootstrap_only_requires_drive_oauth" }));
+}
+if (!bootstrapOnly) {
 report.library.reusable_assets_found = manifest.assets.filter((asset) => asset.reusable && ["approved", "uploaded"].includes(asset.status)).length;
 
 function queriesFromContent() {
@@ -252,4 +321,7 @@ if (!dryRun && catalogSession) await saveManifest(manifestPath, manifest);
 console.log(`[Asset Manager] Topic: ${content.id}`);
 console.log(`[Asset Manager] Proposed assets: ${report.proposed_downloads.length}; fallback: ${report.fallback}`);
 console.log(`[Asset Manager] Report: ${basename(reportPath)}`);
+} else {
+  console.log(`[Asset Manager] Bootstrap-only report: ${basename(reportPath)}`);
+}
 

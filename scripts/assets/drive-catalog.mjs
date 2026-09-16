@@ -142,6 +142,11 @@ async function readCatalogFile(fileId, options) {
   });
 }
 
+export async function readDriveCatalog(fileId, options) {
+  const response = await readCatalogFile(fileId, options);
+  return { catalog: validateCatalog(response.data), etag: response.etag ?? null };
+}
+
 async function bootstrapManifest(path) {
   let input;
   try {
@@ -182,6 +187,167 @@ async function verifiedBootstrap(path, options) {
     else skipped += 1;
   }
   return { status: skipped ? "completed_with_skips" : "completed", imported: verified.length, skipped, assets: verified, manifestVersion: manifest.version };
+}
+
+function bootstrapConflict(code, asset, assetIndex, details = {}) {
+  return { code, asset_id: asset?.id ?? null, asset_index: assetIndex, ...details };
+}
+
+async function inspectBootstrapManifest(path) {
+  let input;
+  try {
+    input = JSON.parse(await fs.readFile(path, "utf8"));
+  } catch {
+    return { manifestVersion: 1, assets: [], skipped: 0, conflicts: [bootstrapConflict("bootstrap_manifest_invalid", null, null)] };
+  }
+  if (!Array.isArray(input?.assets)) {
+    return { manifestVersion: 1, assets: [], skipped: 0, conflicts: [bootstrapConflict("bootstrap_manifest_assets_invalid", null, null)] };
+  }
+
+  const assets = [];
+  const conflicts = [];
+  const ids = new Set();
+  const checksums = new Set();
+  for (const [index, rawAsset] of input.assets.entries()) {
+    const asset = rawAsset && typeof rawAsset === "object" && !Array.isArray(rawAsset) ? canonicalAsset(rawAsset) : null;
+    if (!asset) {
+      conflicts.push(bootstrapConflict("malformed_bootstrap_record", null, index));
+      continue;
+    }
+    if (!asset.drive_file_id) {
+      conflicts.push(bootstrapConflict("missing_drive_file_id", asset, index));
+      continue;
+    }
+    if (ids.has(asset.id)) {
+      conflicts.push(bootstrapConflict("duplicate_asset_id", asset, index));
+      continue;
+    }
+    if (checksums.has(asset.checksum)) {
+      conflicts.push(bootstrapConflict("conflicting_sha256", asset, index));
+      continue;
+    }
+    try {
+      validateAsset(asset, index);
+    } catch (error) {
+      conflicts.push(bootstrapConflict("malformed_bootstrap_record", asset, index, { validation_error: error.code ?? error.message }));
+      continue;
+    }
+    ids.add(asset.id);
+    checksums.add(asset.checksum);
+    assets.push(asset);
+  }
+  return { manifestVersion: Number(input.manifest_version ?? input.version ?? 1), assets: orderedAssets(assets), skipped: 0, conflicts };
+}
+
+async function verifyBootstrapAssetDetailed(asset, options) {
+  const url = new URL(`${DRIVE_API}/files/${encodeURIComponent(asset.drive_file_id)}`);
+  url.searchParams.set("fields", "id,name,mimeType,appProperties");
+  url.searchParams.set("supportsAllDrives", "true");
+  try {
+    const response = await driveJsonResponse(url, { method: "GET" }, {
+      ...options,
+      operation: "bootstrap_asset_verify",
+      targetFolderId: options.rootFolderId,
+      targetPath: asset.drive_path ?? "02_Biblioteca Visual/"
+    });
+    const file = response.data;
+    if (file.id !== asset.drive_file_id) return { valid: false, code: "drive_file_not_found" };
+    if (!file.appProperties?.playeconomy_sha256) return { valid: false, code: "missing_playeconomy_sha256" };
+    if (file.appProperties.playeconomy_sha256 !== asset.checksum) return { valid: false, code: "sha256_mismatch" };
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, code: error.status === 404 || error.code === "drive_http_404" ? "drive_file_not_found" : "drive_file_verification_failed" };
+  }
+}
+
+export function assertBootstrapSafetyGate(bootstrap, expectedAssets) {
+  if (!Number.isInteger(expectedAssets) || expectedAssets < 1) throw catalogError("bootstrap_expected_assets_invalid");
+  if (bootstrap.imported !== expectedAssets || bootstrap.skipped !== 0 || bootstrap.conflicts.length !== 0) {
+    throw catalogError("bootstrap_safety_gate_failed", {
+      expected_assets: expectedAssets,
+      imported: bootstrap.imported,
+      skipped: bootstrap.skipped,
+      conflicts: bootstrap.conflicts.length
+    });
+  }
+}
+
+export async function prepareBootstrapOnly(options) {
+  const file = await locateCatalog(options);
+  if (file) {
+    const { catalog } = await readDriveCatalog(file.id, options);
+    return {
+      catalogPreviouslyExisted: true,
+      fileId: file.id,
+      catalog,
+      manifest: manifestFromCatalog(catalog),
+      bootstrap: { imported: 0, skipped: 0, conflicts: [], status: "catalog_already_exists" }
+    };
+  }
+
+  const inspected = await inspectBootstrapManifest(options.bootstrapManifestPath);
+  const conflicts = [...inspected.conflicts];
+  const verified = [];
+  let skipped = inspected.skipped;
+  for (const asset of inspected.assets) {
+    const verification = await verifyBootstrapAssetDetailed(asset, options);
+    if (verification.valid) verified.push(asset);
+    else {
+      skipped += 1;
+      conflicts.push(bootstrapConflict(verification.code, asset, null));
+    }
+  }
+  const manifest = { version: inspected.manifestVersion, assets: orderedAssets(verified) };
+  const catalog = conflicts.length === 0 ? buildCatalog(manifest, { catalogVersion: 1 }) : null;
+  return {
+    catalogPreviouslyExisted: false,
+    fileId: null,
+    catalog,
+    manifest,
+    bootstrap: {
+      status: conflicts.length ? "failed" : "verified",
+      imported: verified.length,
+      skipped,
+      conflicts
+    },
+    session: conflicts.length === 0 ? {
+      exists: false,
+      fileId: null,
+      driveVersion: null,
+      etag: null,
+      catalog,
+      manifest
+    } : null
+  };
+}
+
+function validateBootstrapReadback(catalog, sourceManifest, expectedAssets, { requireImageMediaType = false } = {}) {
+  const valid = validateCatalog(catalog);
+  if (valid.assets.length !== expectedAssets) throw catalogError("bootstrap_readback_asset_count_mismatch", { expected_assets: expectedAssets, persistent_asset_count: valid.assets.length });
+  if (requireImageMediaType && valid.assets.some((asset) => asset.type !== "image")) throw catalogError("bootstrap_readback_non_image_asset");
+  const source = new Map(sourceManifest.assets.map((asset) => [asset.id, asset]));
+  for (const asset of valid.assets) {
+    const original = source.get(asset.id);
+    if (!original || asset.type !== original.type || asset.checksum !== original.checksum || asset.drive_file_id !== original.drive_file_id || JSON.stringify(asset.semantic_relevance ?? null) !== JSON.stringify(original.semantic_relevance ?? null) || asset.total_score !== original.total_score || asset.license !== original.license) {
+      throw catalogError("bootstrap_readback_metadata_mismatch", { asset_id: asset.id });
+    }
+  }
+  return valid;
+}
+
+export async function persistBootstrapOnly(prepared, expectedAssets, options) {
+  assertBootstrapSafetyGate(prepared.bootstrap, expectedAssets);
+  const persisted = await persistDriveCatalog(prepared.session, prepared.manifest, options);
+  try {
+    const readback = await readDriveCatalog(persisted.fileId, options);
+    const catalog = validateBootstrapReadback(readback.catalog, prepared.manifest, expectedAssets, options);
+    return { ...persisted, catalog, readback_validation: "passed" };
+  } catch (error) {
+    error.bootstrap_readback_validation = "failed";
+    error.bootstrap_catalog_file_id = persisted.fileId;
+    error.bootstrap_catalog_created = persisted.created;
+    throw error;
+  }
 }
 
 export async function hydrateDriveCatalog(options) {

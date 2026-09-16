@@ -20,6 +20,15 @@ on:
         description: Optional repository-local V3.4 manifest used only to initialize a missing Drive catalog
         required: false
         default: ""
+      bootstrap_only:
+        description: Only initialize a missing Drive catalog from bootstrap_manifest, then exit
+        required: false
+        type: boolean
+        default: false
+      expected_bootstrap_assets:
+        description: Required asset count for bootstrap_only validation
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -40,6 +49,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Validate bootstrap-only inputs
+        if: inputs.bootstrap_only == true
+        run: |
+          set -euo pipefail
+          [[ "${{ inputs.dry_run }}" == "false" ]] || { echo "::error::bootstrap_only requires dry_run=false"; exit 1; }
+          [[ -n "${{ inputs.bootstrap_manifest }}" ]] || { echo "::error::bootstrap_only requires bootstrap_manifest"; exit 1; }
+          [[ -f "${{ inputs.bootstrap_manifest }}" ]] || { echo "::error::bootstrap_manifest was not found in the checkout"; exit 1; }
+          [[ "${{ inputs.expected_bootstrap_assets }}" =~ ^[1-9][0-9]*$ ]] || { echo "::error::bootstrap_only requires a positive expected_bootstrap_assets value"; exit 1; }
 
       - name: Verify Google Drive OAuth secrets
         env:
@@ -89,6 +107,8 @@ jobs:
             --content "${{ inputs.content_file }}" \
             --dry-run "${{ inputs.dry_run }}" \
             --max-downloads "${{ inputs.max_downloads }}" \
+            --bootstrap-only "${{ inputs.bootstrap_only }}" \
+            --expected-bootstrap-assets "${{ inputs.expected_bootstrap_assets }}" \
             "${bootstrap_args[@]}" \
             --report asset-manager/reports/latest.json
 
