@@ -149,6 +149,10 @@ export function assetRecord(candidate, overrides = {}) {
     checksum: overrides.checksum ?? null,
     drive_path: overrides.drivePath ?? null,
     drive_file_id: overrides.driveFileId ?? null,
+    drive_folder_id: overrides.driveFolderId ?? null,
+    upload_status: overrides.uploadStatus ?? null,
+    upload_date: overrides.uploadDate ?? null,
+    upload_error: overrides.uploadError ?? null,
     local_cache_path: overrides.localCachePath ?? null,
     reusable: overrides.reusable ?? false,
     status: overrides.status ?? "candidate"

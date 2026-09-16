@@ -1,7 +1,7 @@
 import { mkdirSync, promises as fs } from "node:fs";
 import { basename, resolve } from "node:path";
 import { assetRecord, findDuplicate, inspectMetadata, loadManifest, saveManifest, scoreCandidate } from "./catalog.mjs";
-import { driveConfiguration, resolveAssetDestination } from "./drive.mjs";
+import { driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
@@ -18,7 +18,8 @@ const content = JSON.parse(await fs.readFile(contentPath, "utf8"));
 const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downloads"] ?? config.limits.maxDownloads), config.limits.maxDownloads), maxQueries: Math.min(Number(args["max-queries"] ?? config.limits.maxQueries), config.limits.maxQueries) };
 const manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
-const report = { manager: "PlayEconomy Asset Manager V3.2", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: manifest.assets.filter((asset) => asset.reusable && asset.status === "approved").length }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, errors: [], fallback: "editorial_v2" };
+const drive = driveConfiguration();
+const report = { manager: "PlayEconomy Asset Manager V3.3", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: manifest.assets.filter((asset) => asset.reusable && asset.status === "approved").length }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: dryRun ? "not_requested" : "pending", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, errors: [], fallback: "editorial_v2" };
 
 function queriesFromContent() {
   const supplied = content.visual_queries ?? [];
@@ -100,11 +101,25 @@ for (const rejected of selection.rejected) {
   report.rejected_candidates.push({ provider: rejected.provider, query: rejected.query.text, query_intent: rejected.query.intent, rejection_reasons: ["diversity_limit"], missing_fields: [], metadata_warnings: rejected.metadata.warnings, quality_tier: rejected.scored.quality.tier, score_breakdown: rejected.scored.scoreBreakdown, total_score: rejected.totalScore, asset: { title: rejected.candidate.title, source_url: rejected.candidate.sourceUrl, license: rejected.candidate.license } });
 }
 
+let driveReady = false;
+if (!dryRun && drive.configured) {
+  try {
+    await verifyDriveRoot({ accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN, rootFolderId: drive.rootFolderId });
+    report.drive.root_verification = "verified";
+    driveReady = true;
+  } catch (error) {
+    report.drive.root_verification = "failed";
+    report.errors.push(`Drive root verification: ${error.code ?? error.message}`);
+  }
+} else if (!dryRun) {
+  report.drive.root_verification = "not_configured";
+}
+
 const executionChecksums = new Set();
 for (const selected of selection.selected) {
   const { candidate, destination, scored, metadata, query, stats } = selected;
   const record = assetRecord(candidate, { reusable: false, status: "candidate", drivePath: destination.drivePath });
-  const proposal = { query: query.text, query_intent: query.intent, asset_role: scored.classification.role, classification_confidence: scored.classification.confidence, final_category: destination.finalCategory, final_entity: destination.finalEntity, drive_path: destination.drivePath, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, download_status: "not_requested", download_error: null, checksum: null, local_cache_path: null, bytes: 0, asset: record };
+  const proposal = { query: query.text, query_intent: query.intent, asset_role: scored.classification.role, classification_confidence: scored.classification.confidence, final_category: destination.finalCategory, final_entity: destination.finalEntity, drive_path: destination.drivePath, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, download_status: "not_requested", download_error: null, upload_status: "not_requested", upload_error: null, checksum: null, local_cache_path: null, bytes: 0, asset: record };
   if (shouldDownload(dryRun) && Date.now() - startedAt > limits.globalTimeoutMs) {
     proposal.download_status = "error";
     proposal.download_error = "global_timeout";
@@ -118,6 +133,31 @@ for (const selected of selection.selected) {
       report.downloads.successful += 1;
       Object.assign(record, { filename: outcome.filename, mime_type: outcome.mime_type, checksum: outcome.checksum, local_cache_path: outcome.local_cache_path, download_date: new Date().toISOString(), reusable: true, status: "downloaded" });
       manifest.assets.push(record);
+      if (driveReady) {
+        report.drive.attempted += 1;
+        try {
+          const upload = await uploadToDrive(record, destination, { accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN, rootFolderId: drive.rootFolderId });
+          Object.assign(record, { drive_file_id: upload.drive_file_id, drive_folder_id: upload.drive_folder_id, drive_path: upload.drive_path, upload_status: upload.status, upload_date: new Date().toISOString() });
+          Object.assign(proposal, { upload_status: upload.status, drive_file_id: upload.drive_file_id, drive_folder_id: upload.drive_folder_id, drive_path: upload.drive_path });
+          if (upload.status === "uploaded") {
+            record.status = "uploaded";
+            report.drive.successful += 1;
+          } else {
+            report.drive.duplicates_skipped += 1;
+          }
+        } catch (error) {
+          record.upload_status = "failed";
+          record.upload_error = error.code ?? error.message;
+          proposal.upload_status = "failed";
+          proposal.upload_error = record.upload_error;
+          report.drive.failed += 1;
+          report.errors.push(`Drive upload ${record.id}: ${record.upload_error}`);
+        }
+      } else if (!dryRun) {
+        const reason = report.drive.root_verification === "not_configured" ? "drive_not_configured" : "drive_root_not_verified";
+        Object.assign(record, { upload_status: "not_attempted", upload_error: reason });
+        Object.assign(proposal, { upload_status: "not_attempted", upload_error: reason });
+      }
     } else if (outcome.status === "duplicate") {
       report.downloads.duplicates += 1;
       record.status = "duplicate";
@@ -131,7 +171,6 @@ for (const selected of selection.selected) {
 }
 
 report.fallback = report.proposed_downloads.length ? "not-required-after-approval" : "editorial_v2";
-report.drive = driveConfiguration();
 report.finished_at = new Date().toISOString();
 mkdirSync(resolve(reportPath, ".."), { recursive: true });
 await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
