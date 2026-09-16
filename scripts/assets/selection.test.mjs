@@ -19,4 +19,14 @@ const result = selectByScoreAndDiversity([
 
 assert.deepEqual(result.selected.map((item) => item.candidate.title), ["A", "B"]);
 assert.equal(result.rejected[0].candidate.title, "C");
+
+const unclassified = {
+  query: { text: "Guitar Hero controller" },
+  destination: { finalCategory: "Franquicias" },
+  candidate: { title: "missing classification" },
+  totalScore: 114
+};
+const invalidResult = selectByScoreAndDiversity([unclassified], { maxDownloads: 5 });
+assert.equal(invalidResult.selected.length, 0);
+assert.equal(invalidResult.rejected[0].rejectionReason, "missing_classification");
 console.log("selection tests passed");

@@ -1,7 +1,15 @@
 export function selectByScoreAndDiversity(eligible, { maxDownloads, maxSimilar = 2 }) {
   const selected = [];
   const rejected = [];
-  const sorted = [...eligible].sort((left, right) => right.totalScore - left.totalScore);
+  const classified = [];
+  for (const item of eligible) {
+    if (!item.classification || !item.classification.role || !item.destination || !item.destination.finalCategory) {
+      rejected.push({ ...item, rejectionReason: "missing_classification" });
+      continue;
+    }
+    classified.push(item);
+  }
+  const sorted = classified.sort((left, right) => right.totalScore - left.totalScore);
   for (const item of sorted) {
     if (selected.length >= maxDownloads) break;
     const similar = selected.filter((chosen) =>

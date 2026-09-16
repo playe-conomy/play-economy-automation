@@ -87,7 +87,7 @@ for (const query of queriesFromContent()) {
         candidate.company = scored.classification.role === "company" ? destination.finalEntity : null;
         candidate.console = scored.classification.role === "console" ? destination.finalEntity : null;
         candidate.finalEntity = destination.finalEntity;
-        eligible.push({ provider: provider.name, stats, query, candidate, scored, metadata, destination, totalScore: scored.score });
+        eligible.push({ provider: provider.name, stats, query, candidate, scored, classification: scored.classification, metadata, destination, totalScore: scored.score });
       }
     } catch (error) { stats.errors.push(error.message); report.errors.push(`${provider.name}: ${error.message}`); }
   }
