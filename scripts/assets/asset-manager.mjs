@@ -2,6 +2,7 @@ import { mkdirSync, promises as fs } from "node:fs";
 import { basename, resolve } from "node:path";
 import { assetRecord, findDuplicate, inspectMetadata, loadManifest, saveManifest, scoreCandidate } from "./catalog.mjs";
 import { driveAuthenticatedIdentity, driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
+import { hydrateDriveCatalog, persistDriveCatalog } from "./drive-catalog.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
@@ -16,10 +17,66 @@ const dryRun = String(args["dry-run"] ?? "true") !== "false";
 const config = JSON.parse(await fs.readFile(configPath, "utf8"));
 const content = JSON.parse(await fs.readFile(contentPath, "utf8"));
 const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downloads"] ?? config.limits.maxDownloads), config.limits.maxDownloads), maxQueries: Math.min(Number(args["max-queries"] ?? config.limits.maxQueries), config.limits.maxQueries) };
-const manifest = loadManifest(manifestPath);
+let manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
 const drive = driveConfiguration();
-const report = { manager: "PlayEconomy Asset Manager V3.4", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: manifest.assets.filter((asset) => asset.reusable && asset.status === "approved").length }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: dryRun ? "not_requested" : "pending", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, errors: [], fallback: "editorial_v2" };
+const report = { manager: "PlayEconomy Asset Manager V3.6", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, errors: [], fallback: "editorial_v2" };
+let driveReady = false;
+let catalogSession = null;
+
+async function failCatalog(error) {
+  report.catalog.hydration_status = "failed";
+  report.catalog.error = error.code ?? error.message;
+  report.errors.push(`Drive catalog: ${report.catalog.error}`);
+  report.finished_at = new Date().toISOString();
+  mkdirSync(resolve(reportPath, ".."), { recursive: true });
+  await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  throw error;
+}
+
+if (drive.configured) {
+  try {
+    report.drive.authenticated_identity = await driveAuthenticatedIdentity({ accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN });
+    report.drive.identity_check = "verified";
+  } catch (error) {
+    report.drive.identity_check = "failed";
+    report.drive.identity_error = error.code ?? error.message;
+  }
+  try {
+    await verifyDriveRoot({ accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN, rootFolderId: drive.rootFolderId });
+    report.drive.root_verification = "verified";
+    driveReady = true;
+  } catch (error) {
+    report.drive.root_verification = "failed";
+    report.drive.root_verification_error = error.code ?? error.message;
+    report.drive.root_verification_reason = error.details?.reason ?? null;
+    report.drive.root_verification_message = error.details?.message ?? null;
+    await failCatalog(error);
+  }
+  try {
+    catalogSession = await hydrateDriveCatalog({
+      accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN,
+      rootFolderId: drive.rootFolderId,
+      bootstrapManifestPath: args["bootstrap-manifest"] ? resolve(args["bootstrap-manifest"]) : null
+    });
+    manifest = catalogSession.manifest;
+    report.catalog = {
+      ...report.catalog,
+      hydration_status: catalogSession.hydration.status,
+      drive_file_id: catalogSession.fileId,
+      schema_version: catalogSession.catalog.schema_version,
+      hydrated_assets: catalogSession.hydration.asset_count,
+      bootstrap: catalogSession.bootstrap,
+      final_persistent_asset_count: manifest.assets.length
+    };
+  } catch (error) {
+    await failCatalog(error);
+  }
+} else if (!dryRun) {
+  report.drive.root_verification = "not_configured";
+  report.catalog.hydration_status = "not_configured";
+}
+report.library.reusable_assets_found = manifest.assets.filter((asset) => asset.reusable && ["approved", "uploaded"].includes(asset.status)).length;
 
 function queriesFromContent() {
   const supplied = content.visual_queries ?? [];
@@ -102,30 +159,6 @@ for (const rejected of selection.rejected) {
   report.rejected_candidates.push({ provider: rejected.provider, query: rejected.query.text, query_intent: rejected.query.intent, role: rejected.classification?.role ?? null, target_entity: rejected.query.target_entity ?? null, resolved_destination: rejected.destination ?? null, semantic_relevance: rejected.scored?.semantic ?? null, rejection_reasons: ["diversity_limit"], missing_fields: [], metadata_warnings: rejected.metadata.warnings, quality_tier: rejected.scored.quality.tier, score_breakdown: rejected.scored.scoreBreakdown, total_score: rejected.totalScore, asset: { title: rejected.candidate.title, source_url: rejected.candidate.sourceUrl, license: rejected.candidate.license } });
 }
 
-let driveReady = false;
-if (!dryRun && drive.configured) {
-  try {
-    report.drive.authenticated_identity = await driveAuthenticatedIdentity({ accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN });
-    report.drive.identity_check = "verified";
-  } catch (error) {
-    report.drive.identity_check = "failed";
-    report.drive.identity_error = error.code ?? error.message;
-  }
-  try {
-    await verifyDriveRoot({ accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN, rootFolderId: drive.rootFolderId });
-    report.drive.root_verification = "verified";
-    driveReady = true;
-  } catch (error) {
-    report.drive.root_verification = "failed";
-    report.drive.root_verification_error = error.code ?? error.message;
-    report.drive.root_verification_reason = error.details?.reason ?? null;
-    report.drive.root_verification_message = error.details?.message ?? null;
-    report.errors.push(`Drive root verification: ${report.drive.root_verification_error}${report.drive.root_verification_reason ? ` (${report.drive.root_verification_reason})` : ""}`);
-  }
-} else if (!dryRun) {
-  report.drive.root_verification = "not_configured";
-}
-
 const executionChecksums = new Set();
 for (const selected of selection.selected) {
   const { candidate, destination, scored, metadata, query, stats } = selected;
@@ -143,19 +176,20 @@ for (const selected of selection.selected) {
     if (outcome.status === "downloaded") {
       report.downloads.successful += 1;
       Object.assign(record, { filename: outcome.filename, mime_type: outcome.mime_type, checksum: outcome.checksum, local_cache_path: outcome.local_cache_path, download_date: new Date().toISOString(), reusable: true, status: "downloaded" });
-      manifest.assets.push(record);
       if (driveReady) {
         report.drive.attempted += 1;
         try {
           const upload = await uploadToDrive(record, destination, { accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN, rootFolderId: drive.rootFolderId });
-          Object.assign(record, { drive_file_id: upload.drive_file_id, drive_folder_id: upload.drive_folder_id, drive_path: upload.drive_path, upload_status: upload.status, upload_date: new Date().toISOString() });
-          Object.assign(proposal, { upload_status: upload.status, drive_file_id: upload.drive_file_id, drive_folder_id: upload.drive_folder_id, drive_path: upload.drive_path });
+          const drivePath = upload.drive_path ?? destination.drivePath;
+          Object.assign(record, { drive_file_id: upload.drive_file_id, drive_folder_id: upload.drive_folder_id, drive_path: drivePath, upload_status: upload.status, upload_date: new Date().toISOString() });
+          Object.assign(proposal, { upload_status: upload.status, drive_file_id: upload.drive_file_id, drive_folder_id: upload.drive_folder_id, drive_path: drivePath });
           if (upload.status === "uploaded") {
-            record.status = "uploaded";
             report.drive.successful += 1;
           } else {
             report.drive.duplicates_skipped += 1;
           }
+          record.status = "uploaded";
+          manifest.assets.push(record);
         } catch (error) {
           const uploadDiagnostic = {
             http_status: error.status ?? null,
@@ -192,10 +226,30 @@ for (const selected of selection.selected) {
 }
 
 report.fallback = report.proposed_downloads.length ? "not-required-after-approval" : "editorial_v2";
+if (!dryRun && catalogSession) {
+  report.catalog.update_attempted = true;
+  try {
+    const persisted = await persistDriveCatalog(catalogSession, manifest, {
+      accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN,
+      rootFolderId: drive.rootFolderId
+    });
+    report.catalog.update_status = "successful";
+    report.catalog.drive_file_id = persisted.fileId;
+    report.catalog.schema_version = persisted.catalog.schema_version;
+  } catch (error) {
+    report.catalog.update_status = "failed";
+    report.catalog.update_error = error.code ?? error.message;
+    report.catalog.conflict_detected = report.catalog.update_error === "catalog_conflict";
+    report.catalog.media_may_be_uncatalogued = report.drive.successful > 0 || report.drive.duplicates_skipped > 0;
+    report.errors.push(`Drive catalog update: ${report.catalog.update_error}`);
+  }
+}
+report.catalog.final_persistent_asset_count = manifest.assets.length;
 report.finished_at = new Date().toISOString();
 mkdirSync(resolve(reportPath, ".."), { recursive: true });
 await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-if (!dryRun) await saveManifest(manifestPath, manifest);
+if (!dryRun && catalogSession) await saveManifest(manifestPath, manifest);
 console.log(`[Asset Manager] Topic: ${content.id}`);
 console.log(`[Asset Manager] Proposed assets: ${report.proposed_downloads.length}; fallback: ${report.fallback}`);
 console.log(`[Asset Manager] Report: ${basename(reportPath)}`);
+
