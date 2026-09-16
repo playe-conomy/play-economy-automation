@@ -8,7 +8,7 @@ export function driveConfiguration() {
   return {
     rootFolderId: "1T0c4vqzPIPz4QusCP7Jf60EkoNI7nbwx",
     rootPath: "02_Biblioteca Visual",
-    authentication: "Google Cloud Workload Identity Federation with GitHub Actions OIDC",
+    authentication: "Google Drive OAuth user access token",
     configured: Boolean(process.env.GOOGLE_DRIVE_ACCESS_TOKEN)
   };
 }

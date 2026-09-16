@@ -129,7 +129,7 @@ if (!dryRun && drive.configured) {
 const executionChecksums = new Set();
 for (const selected of selection.selected) {
   const { candidate, destination, scored, metadata, query, stats } = selected;
-  const record = assetRecord(candidate, { reusable: false, status: "candidate", drivePath: destination.drivePath });
+  const record = assetRecord(candidate, { reusable: false, status: "candidate", drivePath: destination.drivePath, query: query.text, queryIntent: query.intent, semanticRelevance: scored.semantic, qualityTier: scored.quality.tier, totalScore: scored.score });
   const proposal = { query: query.text, query_intent: query.intent, asset_role: scored.classification.role, classification_confidence: scored.classification.confidence, target_entity: query.target_entity ?? null, final_category: destination.finalCategory, final_entity: destination.finalEntity, drive_path: destination.drivePath, semantic_relevance: scored.semantic, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, download_status: "not_requested", download_error: null, upload_status: "not_requested", upload_error: null, checksum: null, local_cache_path: null, bytes: 0, asset: record };
   if (shouldDownload(dryRun) && Date.now() - startedAt > limits.globalTimeoutMs) {
     proposal.download_status = "error";
