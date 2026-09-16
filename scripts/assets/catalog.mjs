@@ -123,6 +123,7 @@ export function assetRecord(candidate, overrides = {}) {
   return {
     id: overrides.id ?? `asset-${createHash("sha256").update(normalizeSourceUrl(candidate.sourceUrl ?? candidate.title ?? "asset")).digest("hex").slice(0, 16)}`,
     filename: overrides.filename ?? null,
+    title: candidate.title ?? null,
     type: candidate.type ?? "image",
     category: candidate.category ?? null,
     asset_role: candidate.assetRole ?? null,
