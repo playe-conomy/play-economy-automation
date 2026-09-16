@@ -16,9 +16,17 @@ on:
         description: Maximum proposed downloads when dry run is disabled
         required: true
         default: "5"
+      bootstrap_manifest:
+        description: Optional repository-local V3.4 manifest used only to initialize a missing Drive catalog
+        required: false
+        default: ""
 
 permissions:
   contents: read
+
+concurrency:
+  group: playeconomy-asset-catalog-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   manage-assets:
@@ -34,7 +42,6 @@ jobs:
           node-version: 20
 
       - name: Verify Google Drive OAuth secrets
-        if: inputs.dry_run == false
         env:
           GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
@@ -50,7 +57,6 @@ jobs:
           fi
 
       - name: Exchange Google Drive OAuth refresh token
-        if: inputs.dry_run == false
         env:
           GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
@@ -75,14 +81,19 @@ jobs:
 
       - name: Analyze visual asset candidates
         run: |
+          bootstrap_args=()
+          if [[ -n "${{ inputs.bootstrap_manifest }}" ]]; then
+            bootstrap_args=(--bootstrap-manifest "${{ inputs.bootstrap_manifest }}")
+          fi
           node scripts/assets/asset-manager.mjs \
             --content "${{ inputs.content_file }}" \
             --dry-run "${{ inputs.dry_run }}" \
             --max-downloads "${{ inputs.max_downloads }}" \
+            "${bootstrap_args[@]}" \
             --report asset-manager/reports/latest.json
 
       - name: Upload dry-run report
-        if: inputs.dry_run == true
+        if: always() && inputs.dry_run == true
         uses: actions/upload-artifact@v4
         with:
           name: playeconomy-asset-manager-dry-run-report
@@ -91,7 +102,7 @@ jobs:
           retention-days: 7
 
       - name: Upload download review artifact
-        if: inputs.dry_run == false
+        if: always() && inputs.dry_run == false
         uses: actions/upload-artifact@v4
         with:
           name: playeconomy-asset-manager-download-review
@@ -101,3 +112,4 @@ jobs:
             .cache/assets/
           if-no-files-found: error
           retention-days: 7
+
