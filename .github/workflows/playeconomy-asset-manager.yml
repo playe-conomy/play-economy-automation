@@ -42,9 +42,22 @@ jobs:
             --report asset-manager/reports/latest.json
 
       - name: Upload dry-run report
+        if: inputs.dry_run == true
         uses: actions/upload-artifact@v4
         with:
           name: playeconomy-asset-manager-dry-run-report
           path: asset-manager/reports/latest.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload download review artifact
+        if: inputs.dry_run == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: playeconomy-asset-manager-download-review
+          path: |
+            asset-manager/reports/latest.json
+            asset-manager/manifest.json
+            .cache/assets/
           if-no-files-found: error
           retention-days: 7
