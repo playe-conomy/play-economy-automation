@@ -156,12 +156,22 @@ for (const selected of selection.selected) {
             report.drive.duplicates_skipped += 1;
           }
         } catch (error) {
+          const uploadDiagnostic = {
+            http_status: error.status ?? null,
+            reason: error.details?.reason ?? null,
+            message: error.details?.message ?? null,
+            stage: error.operation ?? "unknown",
+            target_folder_id: error.target_folder_id ?? null,
+            target_path: error.target_path ?? null
+          };
           record.upload_status = "failed";
           record.upload_error = error.code ?? error.message;
+          record.upload_diagnostic = uploadDiagnostic;
           proposal.upload_status = "failed";
           proposal.upload_error = record.upload_error;
+          proposal.upload_diagnostic = uploadDiagnostic;
           report.drive.failed += 1;
-          report.errors.push(`Drive upload ${record.id}: ${record.upload_error}`);
+          report.errors.push(`Drive upload ${record.id}: ${record.upload_error} at ${uploadDiagnostic.stage}`);
         }
       } else if (!dryRun) {
         const reason = report.drive.root_verification === "not_configured" ? "drive_not_configured" : "drive_root_not_verified";

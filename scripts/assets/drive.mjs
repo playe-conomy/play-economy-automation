@@ -61,9 +61,15 @@ function driveHeaders(accessToken, headers = {}) {
   return { Authorization: `Bearer ${accessToken}`, ...headers };
 }
 
-async function driveJson(url, options, { accessToken, fetchImpl = fetch }) {
+async function driveJson(url, options, { accessToken, fetchImpl = fetch, operation = "drive_request", targetFolderId = null, targetPath = null }) {
   const response = await fetchImpl(url, { ...options, headers: driveHeaders(accessToken, options.headers) });
-  if (!response.ok) throw await driveError(`drive_http_${response.status}`, response);
+  if (!response.ok) {
+    const error = await driveError(`drive_http_${response.status}`, response);
+    error.operation = operation;
+    error.target_folder_id = targetFolderId;
+    error.target_path = targetPath;
+    throw error;
+  }
   return response.status === 204 ? null : response.json();
 }
 
@@ -71,23 +77,23 @@ function escapedQueryValue(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
-async function listFolders(parentId, name, options) {
+async function listFolders(parentId, name, operation, targetPath, options) {
   const query = `'${escapedQueryValue(parentId)}' in parents and name = '${escapedQueryValue(name)}' and mimeType = '${FOLDER_MIME_TYPE}' and trashed = false`;
   const url = new URL(`${DRIVE_API}/files`);
   url.searchParams.set("q", query);
   url.searchParams.set("fields", "files(id,name,mimeType)");
   url.searchParams.set("supportsAllDrives", "true");
   url.searchParams.set("includeItemsFromAllDrives", "true");
-  const result = await driveJson(url, { method: "GET" }, options);
+  const result = await driveJson(url, { method: "GET" }, { ...options, operation, targetFolderId: parentId, targetPath });
   return result.files ?? [];
 }
 
-async function createFolder(name, parentId, options) {
+async function createFolder(name, parentId, targetPath, options) {
   return driveJson(`${DRIVE_API}/files?supportsAllDrives=true`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, mimeType: FOLDER_MIME_TYPE, parents: [parentId] })
-  }, options);
+  }, { ...options, operation: "entity_folder_create", targetFolderId: parentId, targetPath });
 }
 
 export async function verifyDriveRoot(options = {}) {
@@ -95,7 +101,7 @@ export async function verifyDriveRoot(options = {}) {
   const url = new URL(`${DRIVE_API}/files/${encodeURIComponent(rootFolderId)}`);
   url.searchParams.set("fields", "id,name,mimeType");
   url.searchParams.set("supportsAllDrives", "true");
-  const root = await driveJson(url, { method: "GET" }, options);
+  const root = await driveJson(url, { method: "GET" }, { ...options, operation: "root_verification", targetFolderId: rootFolderId, targetPath: "02_Biblioteca Visual/" });
   if (root.name !== "02_Biblioteca Visual" || root.mimeType !== FOLDER_MIME_TYPE) throw await driveError("drive_root_mismatch");
   return root;
 }
@@ -103,19 +109,21 @@ export async function verifyDriveRoot(options = {}) {
 export async function driveAuthenticatedIdentity(options = {}) {
   const url = new URL(`${DRIVE_API}/about`);
   url.searchParams.set("fields", "user(emailAddress)");
-  const result = await driveJson(url, { method: "GET" }, options);
+  const result = await driveJson(url, { method: "GET" }, { ...options, operation: "identity_check" });
   return result.user?.emailAddress ?? null;
 }
 
 export async function resolveDriveFolder(destination, options = {}) {
   const { rootFolderId = driveConfiguration().rootFolderId } = options;
-  const categories = await listFolders(rootFolderId, destination.finalCategory, options);
+  const categoryPath = `02_Biblioteca Visual/${destination.finalCategory}/`;
+  const categories = await listFolders(rootFolderId, destination.finalCategory, "destination_category_lookup", categoryPath, options);
   if (!categories.length) throw await driveError("drive_category_missing");
   const categoryFolder = categories[0];
-  if (!destination.finalEntity) return { id: categoryFolder.id, path: `02_Biblioteca Visual/${destination.finalCategory}/` };
-  const entities = await listFolders(categoryFolder.id, destination.finalEntity, options);
-  const entityFolder = entities[0] ?? await createFolder(destination.finalEntity, categoryFolder.id, options);
-  return { id: entityFolder.id, path: `02_Biblioteca Visual/${destination.finalCategory}/${destination.finalEntity}/` };
+  if (!destination.finalEntity) return { id: categoryFolder.id, path: categoryPath };
+  const entityPath = `${categoryPath}${destination.finalEntity}/`;
+  const entities = await listFolders(categoryFolder.id, destination.finalEntity, "destination_entity_lookup", entityPath, options);
+  const entityFolder = entities[0] ?? await createFolder(destination.finalEntity, categoryFolder.id, entityPath, options);
+  return { id: entityFolder.id, path: entityPath };
 }
 
 async function findDriveDuplicate(checksum, options) {
@@ -125,7 +133,8 @@ async function findDriveDuplicate(checksum, options) {
   url.searchParams.set("fields", "files(id,name)");
   url.searchParams.set("supportsAllDrives", "true");
   url.searchParams.set("includeItemsFromAllDrives", "true");
-  const result = await driveJson(url, { method: "GET" }, options);
+  const root = driveConfiguration();
+  const result = await driveJson(url, { method: "GET" }, { ...options, operation: "checksum_lookup", targetFolderId: options.rootFolderId ?? root.rootFolderId, targetPath: `${root.rootPath}/` });
   return result.files?.[0] ?? null;
 }
 
@@ -148,6 +157,6 @@ export async function uploadToDrive(record, destination, options = {}) {
   url.searchParams.set("uploadType", "multipart");
   url.searchParams.set("fields", "id,name,parents,createdTime,appProperties");
   url.searchParams.set("supportsAllDrives", "true");
-  const file = await driveJson(url, { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body }, options);
+  const file = await driveJson(url, { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body }, { ...options, operation: "file_upload", targetFolderId: folder.id, targetPath: folder.path });
   return { status: "uploaded", drive_file_id: file.id, drive_folder_id: folder.id, drive_path: folder.path };
 }

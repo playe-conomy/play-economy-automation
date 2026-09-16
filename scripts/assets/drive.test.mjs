@@ -60,6 +60,15 @@ await assert.rejects(
   { code: "drive_category_missing" }
 );
 
+await assert.rejects(
+  uploadToDrive({ filename: "asset.jpg", mime_type: "image/jpeg", checksum: "sha256-test", local_cache_path: "unused" }, { finalCategory: "Tecnología", finalEntity: null }, {
+    accessToken: "test-token",
+    rootFolderId: rootId,
+    fetchImpl: async () => json({ error: { message: "Access denied", errors: [{ reason: "insufficientFilePermissions" }] } }, 403)
+  }),
+  (error) => error.code === "drive_http_403" && error.operation === "checksum_lookup" && error.target_folder_id === rootId && error.target_path === "02_Biblioteca Visual/" && error.details.reason === "insufficientFilePermissions"
+);
+
 const cacheDir = await mkdtemp(join(tmpdir(), "playeconomy-drive-test-"));
 try {
   const cachePath = join(cacheDir, "asset.jpg");
