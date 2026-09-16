@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   manage-assets:
@@ -33,7 +34,19 @@ jobs:
         with:
           node-version: 20
 
+      - name: Authenticate to Google Cloud for Drive upload
+        if: inputs.dry_run == false
+        id: google-auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/619079310317/locations/global/workloadIdentityPools/playeconomy-github/providers/github-actions
+          service_account: playeconomy-github@playeconomy-automation.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive
+
       - name: Analyze visual asset candidates
+        env:
+          GOOGLE_DRIVE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
         run: |
           node scripts/assets/asset-manager.mjs \
             --content "${{ inputs.content_file }}" \
