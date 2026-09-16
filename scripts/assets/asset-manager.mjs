@@ -1,7 +1,7 @@
 import { mkdirSync, promises as fs } from "node:fs";
 import { basename, resolve } from "node:path";
 import { assetRecord, findDuplicate, inspectMetadata, loadManifest, saveManifest, scoreCandidate } from "./catalog.mjs";
-import { driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
+import { driveAuthenticatedIdentity, driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
@@ -104,12 +104,22 @@ for (const rejected of selection.rejected) {
 let driveReady = false;
 if (!dryRun && drive.configured) {
   try {
+    report.drive.authenticated_identity = await driveAuthenticatedIdentity({ accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN });
+    report.drive.identity_check = "verified";
+  } catch (error) {
+    report.drive.identity_check = "failed";
+    report.drive.identity_error = error.code ?? error.message;
+  }
+  try {
     await verifyDriveRoot({ accessToken: process.env.GOOGLE_DRIVE_ACCESS_TOKEN, rootFolderId: drive.rootFolderId });
     report.drive.root_verification = "verified";
     driveReady = true;
   } catch (error) {
     report.drive.root_verification = "failed";
-    report.errors.push(`Drive root verification: ${error.code ?? error.message}`);
+    report.drive.root_verification_error = error.code ?? error.message;
+    report.drive.root_verification_reason = error.details?.reason ?? null;
+    report.drive.root_verification_message = error.details?.message ?? null;
+    report.errors.push(`Drive root verification: ${report.drive.root_verification_error}${report.drive.root_verification_reason ? ` (${report.drive.root_verification_reason})` : ""}`);
   }
 } else if (!dryRun) {
   report.drive.root_verification = "not_configured";
