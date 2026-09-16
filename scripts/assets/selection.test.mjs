@@ -29,4 +29,12 @@ const unclassified = {
 const invalidResult = selectByScoreAndDiversity([unclassified], { maxDownloads: 5 });
 assert.equal(invalidResult.selected.length, 0);
 assert.equal(invalidResult.rejected[0].rejectionReason, "missing_classification");
+
+const limitedCandidates = selectByScoreAndDiversity([
+  eligible("strong cover", 180),
+  eligible("strong controller", 170),
+  { ...eligible("strong promotional art", 160), query: { text: "Guitar Hero official promotional artwork" }, classification: { role: "official_art" } }
+], { maxDownloads: 5, maxSimilar: 5 });
+assert.deepEqual(limitedCandidates.selected.map((item) => item.candidate.title), ["strong cover", "strong controller", "strong promotional art"]);
+assert.equal(limitedCandidates.selected.length, 3);
 console.log("selection tests passed");

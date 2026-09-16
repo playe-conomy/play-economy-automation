@@ -19,7 +19,7 @@ const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downl
 const manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
 const drive = driveConfiguration();
-const report = { manager: "PlayEconomy Asset Manager V3.3", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: manifest.assets.filter((asset) => asset.reusable && asset.status === "approved").length }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: dryRun ? "not_requested" : "pending", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, errors: [], fallback: "editorial_v2" };
+const report = { manager: "PlayEconomy Asset Manager V3.4", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: manifest.assets.filter((asset) => asset.reusable && asset.status === "approved").length }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: dryRun ? "not_requested" : "pending", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, errors: [], fallback: "editorial_v2" };
 
 function queriesFromContent() {
   const supplied = content.visual_queries ?? [];
@@ -66,6 +66,7 @@ for (const query of queriesFromContent()) {
         const scored = scoreCandidate(candidate, query);
         const metadata = inspectMetadata(candidate);
         const duplicate = findDuplicate(manifest, candidate);
+        const destination = resolveAssetDestination(scored.classification.role, { entity: scored.classification.entity });
         const rejectionReasons = [];
         if (duplicate) rejectionReasons.push("duplicate");
         if (!candidate.sourceUrl || !candidate.downloadUrl) rejectionReasons.push("invalid_url");
@@ -73,18 +74,18 @@ for (const query of queriesFromContent()) {
         if (!scored.license.allowed) rejectionReasons.push(scored.license.reason === "license-not-reusable" ? "license_unknown" : "license_not_allowed");
         if (scored.quality.tier === "low_resolution" || scored.quality.tier === "reject") rejectionReasons.push("insufficient_resolution");
         if (!String(candidate.mimeType ?? "").startsWith("image/")) rejectionReasons.push("unsupported_mime");
+        if (!scored.semantic.passed) rejectionReasons.push("low_semantic_relevance");
         if (scored.score < config.scoring.minimumScore) rejectionReasons.push("low_relevance");
         if (rejectionReasons.length) {
           stats.rejected += 1;
           if (duplicate) report.duplicates += 1;
           rejectionReasons.forEach((reason) => report.rejection_summary[reason] = (report.rejection_summary[reason] ?? 0) + 1);
-          report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, rejection_reasons: [...new Set(rejectionReasons)], missing_fields: metadata.missingFields, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, license_url: candidate.licenseUrl, width: candidate.width, height: candidate.height } });
+          report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, role: scored.classification.role, target_entity: query.target_entity ?? null, resolved_destination: destination, semantic_relevance: scored.semantic, rejection_reasons: [...new Set(rejectionReasons)], missing_fields: metadata.missingFields, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, license_url: candidate.licenseUrl, width: candidate.width, height: candidate.height } });
           continue;
         }
-        const destination = resolveAssetDestination(scored.classification.role, { entity: scored.classification.entity });
         candidate.assetRole = scored.classification.role;
         candidate.category = destination.finalCategory;
-        candidate.franchise = ["specific", "gameplay", "character", "official_art", "map"].includes(scored.classification.role) ? destination.finalEntity : null;
+        candidate.franchise = ["specific", "cover_art", "gameplay", "character", "official_art", "map"].includes(scored.classification.role) ? destination.finalEntity : null;
         candidate.company = scored.classification.role === "company" ? destination.finalEntity : null;
         candidate.console = scored.classification.role === "console" ? destination.finalEntity : null;
         candidate.finalEntity = destination.finalEntity;
@@ -98,7 +99,7 @@ const selection = selectByScoreAndDiversity(eligible, limits);
 for (const rejected of selection.rejected) {
   rejected.stats.rejected += 1;
   report.rejection_summary.diversity_limit = (report.rejection_summary.diversity_limit ?? 0) + 1;
-  report.rejected_candidates.push({ provider: rejected.provider, query: rejected.query.text, query_intent: rejected.query.intent, rejection_reasons: ["diversity_limit"], missing_fields: [], metadata_warnings: rejected.metadata.warnings, quality_tier: rejected.scored.quality.tier, score_breakdown: rejected.scored.scoreBreakdown, total_score: rejected.totalScore, asset: { title: rejected.candidate.title, source_url: rejected.candidate.sourceUrl, license: rejected.candidate.license } });
+  report.rejected_candidates.push({ provider: rejected.provider, query: rejected.query.text, query_intent: rejected.query.intent, role: rejected.classification?.role ?? null, target_entity: rejected.query.target_entity ?? null, resolved_destination: rejected.destination ?? null, semantic_relevance: rejected.scored?.semantic ?? null, rejection_reasons: ["diversity_limit"], missing_fields: [], metadata_warnings: rejected.metadata.warnings, quality_tier: rejected.scored.quality.tier, score_breakdown: rejected.scored.scoreBreakdown, total_score: rejected.totalScore, asset: { title: rejected.candidate.title, source_url: rejected.candidate.sourceUrl, license: rejected.candidate.license } });
 }
 
 let driveReady = false;
@@ -129,7 +130,7 @@ const executionChecksums = new Set();
 for (const selected of selection.selected) {
   const { candidate, destination, scored, metadata, query, stats } = selected;
   const record = assetRecord(candidate, { reusable: false, status: "candidate", drivePath: destination.drivePath });
-  const proposal = { query: query.text, query_intent: query.intent, asset_role: scored.classification.role, classification_confidence: scored.classification.confidence, final_category: destination.finalCategory, final_entity: destination.finalEntity, drive_path: destination.drivePath, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, download_status: "not_requested", download_error: null, upload_status: "not_requested", upload_error: null, checksum: null, local_cache_path: null, bytes: 0, asset: record };
+  const proposal = { query: query.text, query_intent: query.intent, asset_role: scored.classification.role, classification_confidence: scored.classification.confidence, target_entity: query.target_entity ?? null, final_category: destination.finalCategory, final_entity: destination.finalEntity, drive_path: destination.drivePath, semantic_relevance: scored.semantic, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, download_status: "not_requested", download_error: null, upload_status: "not_requested", upload_error: null, checksum: null, local_cache_path: null, bytes: 0, asset: record };
   if (shouldDownload(dryRun) && Date.now() - startedAt > limits.globalTimeoutMs) {
     proposal.download_status = "error";
     proposal.download_error = "global_timeout";

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { allowedLicense, classifyAsset, inspectMetadata, qualityTier, scoreCandidate } from "./catalog.mjs";
+import { allowedLicense, classifyAsset, inspectMetadata, qualityTier, scoreCandidate, semanticRelevance } from "./catalog.mjs";
 import { resolveAssetDestination } from "./drive.mjs";
 
 const specificQuery = { text: "Guitar Hero controller", intent: "specific", target_entity: "Guitar Hero", target_category: "Franquicias" };
@@ -51,6 +51,33 @@ const djHero = { ...genericGuitar, title: "DJ Hero PS3 Turntable", tags: ["DJ He
 const djHeroRole = classifyAsset(djHero, gameplayQuery);
 assert.equal(djHeroRole.role, "contextual_broll");
 assert.equal(resolveAssetDestination(djHeroRole.role, { entity: djHeroRole.entity }).drivePath, "02_Biblioteca Visual/Tecnología/");
+
+const coverQuery = { text: "Guitar Hero game cover", intent: "cover_art", target_entity: "Guitar Hero", target_category: "Franquicias" };
+const coverArt = { ...controller, title: "Guitar Hero III game cover artwork", tags: ["Guitar Hero", "cover art", "box art"] };
+const coverScore = scoreCandidate(coverArt, coverQuery);
+assert.equal(classifyAsset(coverArt, coverQuery).role, "cover_art");
+assert.equal(coverScore.semantic.passed, true);
+assert.deepEqual(resolveAssetDestination(coverScore.classification.role, { entity: coverScore.classification.entity }), {
+  finalCategory: "Franquicias", finalEntity: "Guitar Hero", drivePath: "02_Biblioteca Visual/Franquicias/Guitar Hero/"
+});
+
+const officialQuery = { text: "Guitar Hero official promotional artwork", intent: "official_art", target_entity: "Guitar Hero", target_category: "Franquicias" };
+const officialArt = { ...controller, title: "Guitar Hero official promotional key art", tags: ["Guitar Hero", "official", "promotional artwork"] };
+const officialScore = scoreCandidate(officialArt, officialQuery);
+assert.equal(officialScore.classification.role, "official_art");
+assert.equal(officialScore.semantic.passed, true);
+assert.equal(resolveAssetDestination(officialScore.classification.role, { entity: officialScore.classification.entity }).drivePath, "02_Biblioteca Visual/Franquicias/Guitar Hero/");
+
+const activisionQuery = { text: "Activision logo office", intent: "company", target_entity: "Activision", target_category: "Empresas" };
+const officeDirectory = { ...controller, title: "Nangang Station Building A office directories", description: "Office building directory", tags: ["office", "directory"] };
+const officeRelevance = semanticRelevance(officeDirectory, activisionQuery);
+assert.equal(officeRelevance.passed, false);
+assert.ok(officeRelevance.reasons.includes("target_entity_missing"));
+
+assert.equal(scoreCandidate(genericGuitar, brollQuery).semantic.passed, true);
+assert.ok(coverScore.score > scoreCandidate(genericGuitar, brollQuery).score);
+assert.equal(scoreCandidate(djHero, gameplayQuery).semantic.passed, false);
+assert.equal(allowedLicense({ ...coverArt, license: "Unknown", licenseUrl: null }).allowed, false);
 
 const verticalUsable = { ...controller, width: 500, height: 1024 };
 const wideHighQuality = { ...controller, width: 2122, height: 1499 };

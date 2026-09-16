@@ -21,6 +21,7 @@ export function resolveAssetDestination(assetRole, metadata = {}) {
   const entity = metadata.entity ?? metadata.franchise ?? metadata.company ?? metadata.console ?? null;
   const folders = {
     specific: "Franquicias",
+    cover_art: "Franquicias",
     gameplay: "Gameplay",
     company: "Empresas",
     console: "Consolas",
@@ -28,6 +29,9 @@ export function resolveAssetDestination(assetRole, metadata = {}) {
     official_art: "Arte Oficial",
     map: "Mapas"
   };
+  if (assetRole === "official_art" && entity) {
+    return { finalCategory: "Franquicias", finalEntity: entity, drivePath: `02_Biblioteca Visual/Franquicias/${entity}/` };
+  }
   if (assetRole === "technology" || assetRole === "contextual_broll") {
     return { finalCategory: "Tecnología", finalEntity: null, drivePath: "02_Biblioteca Visual/Tecnología/" };
   }

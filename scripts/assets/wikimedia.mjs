@@ -15,6 +15,7 @@ export async function searchWikimedia(query, limits, request) {
       provider: "wikimedia",
       type: "image",
       title: page.title?.replace(/^File:/, "") ?? "Untitled Wikimedia asset",
+      description: metadata(image, "ImageDescription") ?? metadata(image, "ObjectName"),
       tags: [],
       sourceUrl: image.descriptionurl ?? page.canonicalurl,
       downloadUrl: image.url,

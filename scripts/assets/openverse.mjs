@@ -20,6 +20,7 @@ export async function searchOpenverse(query, limits, request) {
     provider: "openverse",
     type: "image",
     title: item.title ?? "Untitled Openverse asset",
+    description: item.description ?? null,
     tags: item.tags?.map((tag) => tag.name ?? tag) ?? [],
     sourceUrl: item.foreign_landing_url ?? item.url,
     downloadUrl: item.url,
