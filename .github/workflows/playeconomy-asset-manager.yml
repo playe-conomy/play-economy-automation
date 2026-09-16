@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   manage-assets:
@@ -34,19 +33,47 @@ jobs:
         with:
           node-version: 20
 
-      - name: Authenticate to Google Cloud for Drive upload
+      - name: Verify Google Drive OAuth secrets
         if: inputs.dry_run == false
-        id: google-auth
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: projects/619079310317/locations/global/workloadIdentityPools/playeconomy-github/providers/github-actions
-          service_account: playeconomy-github@playeconomy-automation.iam.gserviceaccount.com
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/drive
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+        run: |
+          missing=()
+          [[ -n "$GOOGLE_DRIVE_CLIENT_ID" ]] || missing+=(GOOGLE_DRIVE_CLIENT_ID)
+          [[ -n "$GOOGLE_DRIVE_CLIENT_SECRET" ]] || missing+=(GOOGLE_DRIVE_CLIENT_SECRET)
+          [[ -n "$GOOGLE_DRIVE_REFRESH_TOKEN" ]] || missing+=(GOOGLE_DRIVE_REFRESH_TOKEN)
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing required Google Drive OAuth secret(s): ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Exchange Google Drive OAuth refresh token
+        if: inputs.dry_run == false
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          curl --fail --silent --show-error --request POST "https://oauth2.googleapis.com/token" \
+            --header "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "client_id=$GOOGLE_DRIVE_CLIENT_ID" \
+            --data-urlencode "client_secret=$GOOGLE_DRIVE_CLIENT_SECRET" \
+            --data-urlencode "refresh_token=$GOOGLE_DRIVE_REFRESH_TOKEN" \
+            --data-urlencode "grant_type=refresh_token" \
+            --output "$response_file"
+          access_token="$(node -e 'const fs = require("fs"); let response; try { response = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { process.exit(1); } if (typeof response.access_token !== "string" || !response.access_token) process.exit(1); process.stdout.write(response.access_token);' "$response_file")" || {
+            echo "::error::Google Drive OAuth token exchange returned no access token"
+            exit 1
+          }
+          echo "::add-mask::$access_token"
+          printf 'GOOGLE_DRIVE_ACCESS_TOKEN=%s\n' "$access_token" >> "$GITHUB_ENV"
 
       - name: Analyze visual asset candidates
-        env:
-          GOOGLE_DRIVE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
         run: |
           node scripts/assets/asset-manager.mjs \
             --content "${{ inputs.content_file }}" \
