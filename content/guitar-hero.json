@@ -19,6 +19,9 @@
   "visual_queries": [
     {"query": "Guitar Hero controller", "intent": "specific", "target_category": "Franquicias", "target_entity": "Guitar Hero"},
     {"query": "Guitar Hero gameplay", "intent": "gameplay", "target_category": "Gameplay", "target_entity": "Guitar Hero"},
+    {"query": "Guitar Hero game cover", "intent": "cover_art", "target_category": "Franquicias", "target_entity": "Guitar Hero"},
+    {"query": "Guitar Hero box art", "intent": "cover_art", "target_category": "Franquicias", "target_entity": "Guitar Hero"},
+    {"query": "Guitar Hero official promotional artwork", "intent": "official_art", "target_category": "Franquicias", "target_entity": "Guitar Hero"},
     {"query": "Activision logo office", "intent": "company", "target_category": "Empresas", "target_entity": "Activision"},
     {"query": "electric guitar concert", "intent": "contextual_broll", "target_category": "Tecnología", "target_entity": null},
     {"query": "music video game accessories", "intent": "technology", "target_category": "Tecnología", "target_entity": null}
