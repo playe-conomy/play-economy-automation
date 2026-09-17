@@ -4,6 +4,7 @@ import { assetRecord, attributionLines, classifyRights, coverageGaps, deriveCove
 import { driveAuthenticatedIdentity, driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
 import { hydrateDriveCatalog, persistDriveCatalog, persistBootstrapOnly, prepareBootstrapOnly } from "./drive-catalog.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
+import { createActivisionGamesBlogAdapter } from "./activision-games-blog.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
 import { searchWikimedia } from "./wikimedia.mjs";
@@ -177,9 +178,49 @@ async function request(url, provider) {
   throw lastError;
 }
 
+async function requestPublic(url, { method, accept, provider }) {
+  let current = new URL(url);
+  const hops = [current.toString()];
+  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), limits.httpTimeoutMs);
+    try {
+      const response = await fetch(current, {
+        method,
+        redirect: "manual",
+        signal: controller.signal,
+        headers: { "User-Agent": config.userAgent, Accept: accept }
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location || redirectCount === 3) throw new Error(`${provider} redirect_invalid`);
+        current = new URL(location, current);
+        hops.push(current.toString());
+        continue;
+      }
+      if (!response.ok) throw new Error(`${provider} HTTP ${response.status}`);
+      return {
+        ok: true,
+        url: current.toString(),
+        hops,
+        contentType: response.headers.get("content-type")?.split(";")[0] ?? null,
+        html: method === "GET" ? await response.text() : null
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(`${provider} redirect_invalid`);
+}
+
 const providers = [
   { name: "Openverse", search: (query) => searchOpenverse(query, limits, (url, _limits, provider) => request(url, provider)) },
-  { name: "Wikimedia", search: (query) => searchWikimedia(query, limits, (url, _limits, provider) => request(url, provider)) }
+  { name: "Wikimedia", search: (query) => searchWikimedia(query, limits, (url, _limits, provider) => request(url, provider)) },
+  ...(report.rights.effective_copyrighted_editorial_permission ? [createActivisionGamesBlogAdapter({
+    registry: rightsConfig.official_source_registry,
+    fetchArticle: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "Activision Games Blog" }),
+    inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "Activision Games Blog" })
+  })] : [])
 ];
 
 const eligible = [];
@@ -336,4 +377,3 @@ console.log(`[Asset Manager] Report: ${basename(reportPath)}`);
 } else {
   console.log(`[Asset Manager] Bootstrap-only report: ${basename(reportPath)}`);
 }
-

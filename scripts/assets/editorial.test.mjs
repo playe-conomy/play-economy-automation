@@ -27,7 +27,7 @@ const logo = { ...openScreenshot, title: "Activision logo", description: "Compan
 const concert = { ...openScreenshot, title: "Electric guitar concert", description: "Music stage performance", sourceUrl: "https://open.example.test/concert" };
 
 assert.equal(config.rights.copyrighted_editorial_enabled, false, "global controlled-risk switch defaults to false");
-assert.deepEqual(config.rights.official_source_registry, [], "registry is intentionally empty before V3.7.2");
+assert.equal(config.rights.official_source_registry[0]?.id, "activision-games-blog-guitar-hero-live", "the reviewed V3.7.2 registry source is configured while the global switch remains disabled");
 assert.equal(classifyRights(openScreenshot).rightsClass, RIGHTS_CLASSES.OPEN_LICENSE);
 assert.equal(classifyRights({ ...openScreenshot, license: "Unknown" }).rightsClass, RIGHTS_CLASSES.REJECTED_OR_UNKNOWN);
 

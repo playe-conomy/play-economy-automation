@@ -61,7 +61,15 @@ Copyrighted editorial candidates require a registry-approved first-party source,
 
 Candidates may carry an optional `editorial_form`: `screenshot`, `lifestyle`, `clean_art`, `physical_case`, `product`, `logo`, or `contextual`. Deterministic `visual_utility` ranks an exact requested form above weaker editorial forms after rights, media and semantic gates. Scene intent produces ephemeral coverage requirements and up to eight deliberate queries; unmet requirements are reported as `coverage_gap` rather than weakening gates.
 
-The Asset Manager review artifact contains reports and the manifest only. It intentionally excludes `.cache/assets/` source media. V4 already excludes its fetched source media from review artifacts. V3.7.2 may add reviewed registry-backed official-source adapters; V3.7.1 adds no provider or web ingestion.
+The Asset Manager review artifact contains reports and the manifest only. It intentionally excludes `.cache/assets/` source media. V4 already excludes its fetched source media from review artifacts.
+
+## V3.7.2 Activision Games Blog adapter
+
+`scripts/assets/activision-games-blog.mjs` is the first official-source adapter. It is a controlled, fixed Guitar Hero Live integration, not a general Activision crawler. It requests at most three reviewed public articles per run, and only when a matching Guitar Hero coverage requirement exists and both copyrighted-editorial switches are enabled. The exact allowlist is the Hero Powers article, the Guitar Hero Live announcement, and the Guitar Hero Live controller article. It never crawls archive pages, follows arbitrary article links, uses a search engine, authenticates, or accesses private APIs.
+
+The registry relationship is explicit: `blog.activision.com` is the provenance page host, while only `community.activision.com` may supply directly linked media. Article and media redirects are checked manually and fail closed when a hop leaves its approved host. The adapter extracts article-body image references (`img`, `srcset`, `picture/source`, and direct article links), removes duplicates, and rejects obvious icons, tracking pixels, avatars, site chrome, tiny images, and non-image responses. It emits only the existing `copyrighted_editorial` records with `Activision Publishing, Inc.` ownership, complete first-party provenance, `license: null`, and `license_status: no_open_license_identified`.
+
+The adapter supplies descriptive evidence to the existing generic classifier and selection pipeline: gameplay references support `gameplay`/`screenshot`, controller references support `specific`/`product`, and only reviewed promotional evidence can support cover or official art. It cannot create an Activision company-logo candidate; that remains a coverage gap. It does not imply permission to reuse Activision material: provenance and attribution are documentation only, and the controlled-risk switches remain mandatory.
 
 ## Google Drive authentication
 

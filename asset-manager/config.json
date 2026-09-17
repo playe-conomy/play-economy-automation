@@ -16,7 +16,15 @@
   },
   "rights": {
     "copyrighted_editorial_enabled": false,
-    "official_source_registry": []
+    "official_source_registry": [
+      {
+        "id": "activision-games-blog-guitar-hero-live",
+        "approved": true,
+        "domains": ["blog.activision.com"],
+        "cdn_domains": ["community.activision.com"],
+        "source_types": ["activision_games_blog_article"]
+      }
+    ]
   },
   "drive": {
     "rootFolderId": "1fHW2P2RAASkGXYzT7Cl2BvcrephFZn27",
