@@ -114,27 +114,57 @@ function validatedRedirect(result, expectedHost) {
   return hops.length <= MAX_REDIRECTS + 1 && hops.every((hop) => allowedHost(hop, expectedHost));
 }
 
+function validRegistryEntry(entry) {
+  return entry?.approved === true && entry.domains?.includes(ARTICLE_HOST) && entry.cdn_domains?.includes(MEDIA_HOST) && entry.source_types?.includes("activision_games_blog_article");
+}
+
 export function createActivisionGamesBlogAdapter({ registry, fetchArticle, inspectMedia }) {
-  const entry = (registry ?? []).find((item) => item?.id === REGISTRY_ID && item.approved === true);
+  const entry = (registry ?? []).find((item) => item?.id === REGISTRY_ID);
   const articleCache = new Map();
+  const metrics = { article_requests: 0, media_preflights: 0, source_failures: 0 };
+  const applicable = (query) => articleForQuery(query) !== null;
   return {
     name: "Activision Games Blog",
+    isEligibleForCoverage(queries) {
+      return validRegistryEntry(entry) && queries.some(applicable);
+    },
+    metrics() {
+      return { ...metrics };
+    },
     async search(query) {
       const plan = articleForQuery(query);
-      if (!plan || !entry || !isApprovedArticleUrl(plan.pageUrl)) return [];
-      let article = articleCache.get(plan.pageUrl);
-      if (!article) {
-        article = await fetchArticle(plan.pageUrl);
-        if (!article?.html || !sameUrl(article.url, plan.pageUrl) || !validatedRedirect(article, ARTICLE_HOST)) {
-          throw new Error("activision_games_blog_article_unavailable_or_redirect_unapproved");
-        }
-        articleCache.set(plan.pageUrl, article);
+      if (!plan || !validRegistryEntry(entry) || !isApprovedArticleUrl(plan.pageUrl)) return [];
+      if (!articleCache.has(plan.pageUrl)) {
+        metrics.article_requests += 1;
+        articleCache.set(plan.pageUrl, (async () => {
+          try {
+            const article = await fetchArticle(plan.pageUrl);
+            if (!article?.html || !sameUrl(article.url, plan.pageUrl) || !validatedRedirect(article, ARTICLE_HOST)) {
+              throw new Error("activision_games_blog_article_unavailable_or_redirect_unapproved");
+            }
+            return article;
+          } catch (error) {
+            metrics.source_failures += 1;
+            throw error;
+          }
+        })());
       }
+      const article = await articleCache.get(plan.pageUrl);
       const media = extractApprovedArticleMedia(article.html, plan.pageUrl).filter((item) => mediaMatchesKind(item, plan.kind));
       const candidates = [];
       for (const item of media.slice(0, 1)) {
-        const inspected = await inspectMedia(item.sourceUrl);
-        if (!inspected?.ok || !validatedRedirect(inspected, MEDIA_HOST) || !String(inspected.contentType ?? "").startsWith("image/")) continue;
+        metrics.media_preflights += 1;
+        let inspected;
+        try {
+          inspected = await inspectMedia(item.sourceUrl);
+        } catch {
+          metrics.source_failures += 1;
+          continue;
+        }
+        if (!inspected?.ok || !validatedRedirect(inspected, MEDIA_HOST) || !String(inspected.contentType ?? "").startsWith("image/")) {
+          metrics.source_failures += 1;
+          continue;
+        }
         const metadata = candidateMetadata(item, query);
         candidates.push({
           provider: "activision-games-blog",
