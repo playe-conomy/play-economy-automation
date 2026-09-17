@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { buildVisualLayout, visualDebugPlan } from "./visual-layout.mjs";
+import { inflateSync } from "node:zlib";
+import { visualDebugPlan, wrapCaptionLines } from "./visual-layout.mjs";
 
 const [mode, definitionPath, outputPath = "output", sceneMediaPath] = process.argv.slice(2);
 
@@ -58,26 +59,75 @@ function escapeFilter(value) {
     .replaceAll(",", "\\,");
 }
 
-function wrapCaption(value, maximumLineLength = 38) {
-  const words = String(value).trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return "";
-  const lines = [""];
-  for (const word of words) {
-    const current = lines.at(-1);
-    if (current && `${current} ${word}`.length > maximumLineLength && lines.length < 2) lines.push(word);
-    else lines[lines.length - 1] = current ? `${current} ${word}` : word;
-  }
-  return lines.join("\n");
-}
-
-function captionText(scene, v41) {
-  const caption = v41 ? wrapCaption(scene.caption) : scene.caption;
+function captionText(value, scene, v41) {
+  const caption = v41 ? wrapCaptionLines(value) : value;
   const emphasis = scene.caption_emphasis;
   if (v41 && typeof emphasis === "string" && emphasis && caption.includes(emphasis)) {
     const [before, after] = caption.split(emphasis, 2);
     return `${escapeAss(before)}{\\c&HFF6B00&}${escapeAss(emphasis)}{\\c&HFFFFFF&}${escapeAss(after ?? "")}`;
   }
   return escapeAss(caption);
+}
+
+function paeth(left, up, upperLeft) {
+  const prediction = left + up - upperLeft;
+  const leftDistance = Math.abs(prediction - left);
+  const upDistance = Math.abs(prediction - up);
+  const upperLeftDistance = Math.abs(prediction - upperLeft);
+  return leftDistance <= upDistance && leftDistance <= upperLeftDistance ? left : upDistance <= upperLeftDistance ? up : upperLeft;
+}
+
+function hasTransparentPngPixels(path) {
+  try {
+    const file = readFileSync(path);
+    if (file.toString("hex", 0, 8) !== "89504e470d0a1a0a") return false;
+    let offset = 8;
+    let width;
+    let height;
+    let bitDepth;
+    let colorType;
+    let interlace;
+    const idat = [];
+    while (offset < file.length) {
+      const length = file.readUInt32BE(offset);
+      const type = file.toString("ascii", offset + 4, offset + 8);
+      const data = file.subarray(offset + 8, offset + 8 + length);
+      if (type === "IHDR") {
+        width = data.readUInt32BE(0);
+        height = data.readUInt32BE(4);
+        bitDepth = data[8];
+        colorType = data[9];
+        interlace = data[12];
+      }
+      if (type === "IDAT") idat.push(data);
+      offset += length + 12;
+    }
+    if (bitDepth !== 8 || colorType !== 6 || interlace !== 0 || !width || !height) return false;
+    const raw = inflateSync(Buffer.concat(idat));
+    const stride = width * 4;
+    const previous = Buffer.alloc(stride);
+    let cursor = 0;
+    for (let y = 0; y < height; y += 1) {
+      const filter = raw[cursor++];
+      const row = Buffer.alloc(stride);
+      for (let x = 0; x < stride; x += 1) {
+        const value = raw[cursor++];
+        const left = x >= 4 ? row[x - 4] : 0;
+        const up = previous[x];
+        const upperLeft = x >= 4 ? previous[x - 4] : 0;
+        row[x] = filter === 1 ? (value + left) & 255
+          : filter === 2 ? (value + up) & 255
+            : filter === 3 ? (value + Math.floor((left + up) / 2)) & 255
+              : filter === 4 ? (value + paeth(left, up, upperLeft)) & 255
+                : value;
+      }
+      for (let x = 3; x < stride; x += 4) if (row[x] < 255) return true;
+      row.copy(previous);
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
 
 function captionLines(v41) {
@@ -141,8 +191,7 @@ function legacyDraw() {
 
 function v41Foreground(layouts) {
   const draw = [
-    "drawbox=x=0:y=0:w=1080:h=8:color=0x006BFF:t=fill",
-    "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='PLAYECONOMY':fontcolor=0xD7E7FF:fontsize=24:x=140:y=112"
+    "drawbox=x=0:y=0:w=1080:h=8:color=0x006BFF:t=fill"
   ];
   for (const [index, scene] of definition.scenes.entries()) {
     const layout = layouts[index];
@@ -175,10 +224,19 @@ function mediaFilter(inputIndex, label, layout) {
 function prepare() {
   const sceneMedia = sceneMediaInputs();
   const hasSceneMedia = sceneMedia.assets.length > 0;
+  const sceneAssets = new Map(definition.scenes.map((scene) => [
+    scene.scene_id,
+    sceneMedia.scenes.has(scene.scene_id) ? { asset_id: sceneMedia.scenes.get(scene.scene_id) } : null
+  ]));
+  const transparentLogoAvailable = hasSceneMedia && hasTransparentPngPixels(logoPath);
+  const layouts = hasSceneMedia ? visualDebugPlan({ scenes: definition.scenes, sceneAssets, duration, transparentLogoAvailable }) : [];
   writeFileSync(resolve(outputDir, "narration.txt"), `${definition.narration}\n`, "utf8");
   const assLines = captionLines(hasSceneMedia);
-  for (const scene of definition.scenes) {
-    assLines.push(`Dialogue: 0,${assTimestamp(scene.start + 0.2)},${assTimestamp(scene.end - 0.2)},Caption,,0,0,0,,${captionText(scene, hasSceneMedia)}`);
+  for (const [index, scene] of definition.scenes.entries()) {
+    const segments = hasSceneMedia ? layouts[index].captionSegments : [{ text: scene.caption, start: scene.start + 0.2, end: scene.end - 0.2 }];
+    for (const segment of segments) {
+      assLines.push(`Dialogue: 0,${assTimestamp(segment.start)},${assTimestamp(segment.end)},Caption,,0,0,0,,${captionText(segment.text, scene, hasSceneMedia)}`);
+    }
   }
   writeFileSync(resolve(outputDir, "captions.ass"), `${assLines.join("\n")}\n`, "utf8");
   if (!hasSceneMedia) {
@@ -194,14 +252,10 @@ function prepare() {
     return;
   }
 
-  const sceneAssets = new Map(definition.scenes.map((scene) => [
-    scene.scene_id,
-    sceneMedia.scenes.has(scene.scene_id) ? { asset_id: sceneMedia.scenes.get(scene.scene_id) } : null
-  ]));
-  const layouts = visualDebugPlan({ scenes: definition.scenes, sceneAssets, duration });
-  writeFileSync(resolve(outputDir, "visual-layout.json"), `${JSON.stringify({ version: "4.1", scenes: layouts }, null, 2)}\n`, "utf8");
+  writeFileSync(resolve(outputDir, "visual-layout.json"), `${JSON.stringify({ version: "4.1.1", transparent_logo_available: transparentLogoAvailable, scenes: layouts }, null, 2)}\n`, "utf8");
 
   const endCard = layouts[0].endCard;
+  const normalBranding = layouts[0].normalBranding;
   const mediaFilters = ["[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07121F:t=fill[scene_media_base]"];
   let canvasInput = "[scene_media_base]";
   for (const [index, scene] of definition.scenes.entries()) {
@@ -225,10 +279,12 @@ function prepare() {
   const graph = [
     ...mediaFilters,
     `${canvasInput}${foreground.join(",")}[canvas]`,
-    "[1:v]scale=52:52,format=rgba[avatar]",
+    normalBranding.mode === "transparent_logo"
+      ? `[2:v]scale=${normalBranding.width}:-1,format=rgba[normal_brand]`
+      : `[1:v]scale=${normalBranding.width}:${normalBranding.width},format=rgba[normal_brand]`,
     "[2:v]scale=620:-1,format=rgba[logo]",
-    `[canvas][avatar]overlay=72:104:enable='between(t,0,${endCard.start - 0.1})'[with_avatar]`,
-    `[with_avatar][logo]overlay=(W-w)/2:760:enable='between(t,${endCard.start},${duration})'[v]`
+    `[canvas][normal_brand]overlay=${normalBranding.x}:${normalBranding.y}:enable='between(t,0,${endCard.start - 0.1})'[with_brand]`,
+    `[with_brand][logo]overlay=(W-w)/2:760:enable='between(t,${endCard.start},${duration})'[v]`
   ].join(";\n");
   writeFileSync(resolve(outputDir, "filtergraph.txt"), `${graph}\n`, "utf8");
 }

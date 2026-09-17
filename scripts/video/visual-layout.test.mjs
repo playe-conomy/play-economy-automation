@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SAFE_ZONES, buildVisualLayout, endCardTiming, resolveVisualFamily } from "./visual-layout.mjs";
+import { SAFE_ZONES, buildVisualLayout, endCardTiming, normalBrandingLayout, resolveVisualFamily, segmentCaption, timedCaptionSegments, visualDebugPlan, wrapCaptionLines } from "./visual-layout.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const definition = JSON.parse(await readFile(resolve(repositoryRoot, "content/guitar-hero.json"), "utf8"));
@@ -39,5 +39,28 @@ assert.deepEqual(SAFE_ZONES.main, { left: 48, right: 1032, top: 170, bottom: 147
 assert.deepEqual(SAFE_ZONES.subtitle, { top: 1420, bottom: 1620 }, "subtitle safe zone avoids the lower platform area");
 assert.ok(!layoutSource.includes("fetch("), "visual layout has no network operation");
 assert.ok(!layoutSource.includes("drive"), "visual layout has no Drive operation");
+
+const captionScene = {
+  scene_id: "caption-test",
+  start: 0,
+  end: 5,
+  caption: "Una guitarra de plástico se volvió un negocio millonario."
+};
+const segments = timedCaptionSegments(captionScene);
+assert.deepEqual(segmentCaption(captionScene.caption), segmentCaption(captionScene.caption), "caption segmentation is deterministic");
+assert.ok(segments.length > 1, "an ordinary five-second sentence develops through multiple phrase captions");
+assert.equal(segments[0].start, captionScene.start, "the first caption phrase starts at scene start");
+assert.equal(segments.at(-1).end, captionScene.end, "the final caption phrase ends at scene end");
+for (const [index, segment] of segments.entries()) {
+  if (index > 0) assert.equal(segments[index - 1].end, segment.start, "caption phrases have no gaps or overlaps");
+  assert.ok(wrapCaptionLines(segment.text).split("\n").length <= 2, "caption phrases fit in at most two lines");
+}
+const weightedSegments = timedCaptionSegments({ scene_id: "weighted", start: 0, end: 5, caption: "Uno dos tres cuatro cinco seis siete ocho nueve diez once." });
+assert.ok(weightedSegments[0].word_count > weightedSegments.at(-1).word_count && weightedSegments[0].end - weightedSegments[0].start > weightedSegments.at(-1).end - weightedSegments.at(-1).start, "phrase timing is weighted by word count");
+assert.deepEqual(segmentCaption("El éxito parecía no tener techo."), ["El éxito parecía no tener techo."], "short captions are not unnecessarily fragmented");
+assert.match(segments.map((segment) => segment.text).join(" "), /plástico.*volvió.*millonario/, "Spanish accents and punctuation are preserved");
+assert.deepEqual(normalBrandingLayout({ transparentLogoAvailable: true }), { mode: "transparent_logo", x: 72, y: 112, width: 136 }, "transparent normal branding stays in the upper safe zone");
+assert.equal(normalBrandingLayout({ transparentLogoAvailable: false }).mode, "avatar_fallback", "non-transparent logos fall back gracefully to the existing avatar mark");
+assert.equal(visualDebugPlan({ scenes: definition.scenes, duration: 27, transparentLogoAvailable: true })[0].captionSegments[0].start, 0, "debug plans expose phrase timing");
 
 console.log("visual layout tests passed");

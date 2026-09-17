@@ -10,8 +10,8 @@ const contentPath = join(repositoryRoot, "content", "guitar-hero.json");
 const testDirectory = await mkdtemp(join(tmpdir(), "playeconomy-v4-renderer-"));
 const originalArgv = process.argv;
 
-async function prepare(outputPath, sceneMediaPath = null, suffix) {
-  process.argv = [process.execPath, rendererPath, "prepare", contentPath, outputPath, ...(sceneMediaPath ? [sceneMediaPath] : [])];
+async function prepare(outputPath, sceneMediaPath = null, suffix, definitionPath = contentPath) {
+  process.argv = [process.execPath, rendererPath, "prepare", definitionPath, outputPath, ...(sceneMediaPath ? [sceneMediaPath] : [])];
   await import(`${pathToFileURL(rendererPath).href}?test=${suffix}`);
 }
 
@@ -29,6 +29,9 @@ try {
     /drawbox=x=0:y=0:w=1080:h=1920:color=0x000000:t=fill:enable='between\(t\\,23\\,27\)'/,
     "legacy V2 retains its 23-27 end card"
   );
+  const baselineCaptions = await readFile(join(baselineOutput, "captions.ass"), "utf8");
+  assert.match(baselineCaptions, /Style: Caption,DejaVu Sans,48,.*?,92,92,220,1/, "legacy V2 caption style remains unchanged");
+  assert.equal((baselineCaptions.match(/^Dialogue:/gm) ?? []).length, 5, "legacy V2 retains one caption event per scene");
 
   const imagePaths = {
     identity: join(testDirectory, "identity.jpg"),
@@ -73,8 +76,12 @@ try {
   assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,21\\,27\)'/, "conclusion media is active from 21 to 27 before foreground layers");
   assert.ok(!mediaGraph.includes("drawbox=x=72:y=990"), "generic central dark boxes are absent in V4.1 media mode");
   assert.ok(!mediaGraph.includes("drawbox=x=72:y=1125:w=90"), "generic decorative charts are absent in V4.1 media mode");
-  assert.match(mediaGraph, /drawtext=.*text='PLAYECONOMY'.*fontsize=24/, "normal scenes use a small persistent PlayEconomy identifier");
+  assert.match(mediaGraph, /\[2:v\]scale=136:-1,format=rgba\[normal_brand\]/, "a transparent official logo is preserved as an RGBA normal-scene overlay");
+  assert.match(mediaGraph, /\[canvas\]\[normal_brand\]overlay=72:112/, "normal branding remains inside the upper safe zone");
+  assert.ok(!mediaGraph.includes("text='PLAYECONOMY':fontcolor=0xD7E7FF:fontsize=24"), "normal scene branding does not use an opaque text plate");
   assert.match(mediaCaptions, /Style: Caption,DejaVu Sans,54,.*?,72,72,300,1/, "V4.1 captions use the conservative lower safe zone");
+  assert.ok((mediaCaptions.match(/^Dialogue:/gm) ?? []).length > 5, "V4.1.1 emits phrase-level caption events instead of one static event per scene");
+  assert.ok(!mediaCaptions.includes("{\\c&HFF6B00&}"), "captions do not invent blue semantic emphasis without explicit metadata");
   assert.ok(!mediaGraph.includes("text='CONVERTIDO'"), "normal V4.1 scenes do not repeat the legacy three-line headline stack");
   assert.ok(
     mediaGraph.indexOf(blackEndCard) > lastMediaOverlay,
@@ -82,8 +89,8 @@ try {
   );
   assert.ok(lastMediaOverlay < mediaGraph.indexOf("drawtext="), "existing V2 text overlays remain above selected scene media");
   assert.ok(lastMediaOverlay < mediaGraph.indexOf("subtitles="), "captions remain above selected scene media");
-  assert.ok(lastMediaOverlay < mediaGraph.indexOf("[canvas][avatar]overlay="), "avatar branding remains above selected scene media");
-  assert.ok(lastMediaOverlay < mediaGraph.indexOf("[with_avatar][logo]overlay="), "logo branding remains above selected scene media");
+  assert.ok(lastMediaOverlay < mediaGraph.indexOf("[canvas][normal_brand]overlay="), "normal branding remains above selected scene media");
+  assert.ok(lastMediaOverlay < mediaGraph.indexOf("[with_brand][logo]overlay="), "end-card logo branding remains above selected scene media");
   assert.match(await readFile(rendererPath, "utf8"), /color=c=0x07121F:s=1080x1920:r=30/, "V2 output canvas remains 1080x1920");
   assert.deepEqual(
     visualLayout.scenes.map((scene) => scene.family),
@@ -92,6 +99,18 @@ try {
   );
   assert.equal(visualLayout.scenes[2].companyFallback, true, "debug output documents the Activision no_asset fallback");
   assert.equal(visualLayout.scenes[0].safeZones.subtitle.bottom, 1620, "debug output preserves the conservative subtitle safe zone");
+  assert.equal(visualLayout.transparent_logo_available, true, "debug output records transparent official branding availability");
+  assert.equal(visualLayout.scenes[0].captionSegments[0].start, 0, "debug output includes phrase-level caption timing");
+  assert.equal(visualLayout.scenes.at(-1).captionSegments.at(-1).end, 27, "debug caption timing reaches the final scene end");
+
+  const emphasizedContent = JSON.parse(await readFile(contentPath, "utf8"));
+  emphasizedContent.scenes[0].caption_emphasis = "negocio";
+  const emphasizedContentPath = join(testDirectory, "emphasized-content.json");
+  await writeFile(emphasizedContentPath, JSON.stringify(emphasizedContent));
+  const emphasisOutput = join(testDirectory, "with-emphasis");
+  await prepare(emphasisOutput, sceneMediaPath, "with-emphasis", emphasizedContentPath);
+  const emphasisCaptions = await readFile(join(emphasisOutput, "captions.ass"), "utf8");
+  assert.match(emphasisCaptions, /\{\\c&HFF6B00&\}negocio\{\\c&HFFFFFF&\}/, "explicit caption emphasis remains supported");
 } finally {
   process.argv = originalArgv;
   await rm(testDirectory, { recursive: true, force: true });

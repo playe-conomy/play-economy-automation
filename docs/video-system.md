@@ -32,6 +32,8 @@ The renderer uses the avatar as a small in-video mark and shows the main logo in
 - Generic decorative bar charts and the large central dark box are not used in normal V4.1 scenes. Data graphics require explicit structured numeric `scene.data`; otherwise the renderer does not invent values.
 - V4.1 captions remain scene-timed. They use a conservative lower safe zone, compact wrapping, and optional electric-blue emphasis only when content explicitly provides `caption_emphasis`.
 - For V4.1 media mode, the end card is derived from the content duration and occupies at most the final two seconds. For a 27-second video it runs from 25 to 27 seconds.
+- V4.1.1 splits captions into deterministic phrase events using existing caption text and scene duration only. Phrase timing is weighted by word count, has no gaps or overlaps, and does not attempt speech or word-level alignment.
+- In normal V4.1.1 scenes, the official logo is used as a small RGBA overlay only when it contains real transparent pixels. Otherwise rendering falls back to the existing avatar mark; source brand files are never altered. End-card branding remains unchanged.
 
 ## Add a topic
 
