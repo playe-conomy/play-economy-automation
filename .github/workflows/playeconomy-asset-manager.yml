@@ -16,6 +16,11 @@ on:
         description: Maximum proposed downloads when dry run is disabled
         required: true
         default: "5"
+      enable_copyrighted_editorial_trial:
+        description: Temporarily enable the global copyrighted-editorial layer for this manual run only
+        required: true
+        type: boolean
+        default: false
       allow_copyrighted_editorial:
         description: Permit only registry-verified copyrighted editorial candidates when globally enabled
         required: true
@@ -64,6 +69,26 @@ jobs:
           [[ -f "${{ inputs.bootstrap_manifest }}" ]] || { echo "::error::bootstrap_manifest was not found in the checkout"; exit 1; }
           [[ "${{ inputs.expected_bootstrap_assets }}" =~ ^[1-9][0-9]*$ ]] || { echo "::error::bootstrap_only requires a positive expected_bootstrap_assets value"; exit 1; }
 
+      - name: Prepare controlled editorial trial config
+        env:
+          ENABLE_COPYRIGHTED_EDITORIAL_TRIAL: ${{ inputs.enable_copyrighted_editorial_trial }}
+        run: |
+          set -euo pipefail
+          if [[ "$ENABLE_COPYRIGHTED_EDITORIAL_TRIAL" == "true" ]]; then
+            trial_config="$RUNNER_TEMP/playeconomy-asset-manager-trial-config.json"
+            node -e '
+              const fs = require("fs");
+              const [source, destination] = process.argv.slice(1);
+              const config = JSON.parse(fs.readFileSync(source, "utf8"));
+              config.rights ??= {};
+              config.rights.copyrighted_editorial_enabled = true;
+              fs.writeFileSync(destination, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+            ' asset-manager/config.json "$trial_config"
+            printf 'ASSET_MANAGER_CONFIG_PATH=%s\n' "$trial_config" >> "$GITHUB_ENV"
+          else
+            printf 'ASSET_MANAGER_CONFIG_PATH=%s\n' 'asset-manager/config.json' >> "$GITHUB_ENV"
+          fi
+
       - name: Verify Google Drive OAuth secrets
         env:
           GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
@@ -104,11 +129,13 @@ jobs:
 
       - name: Analyze visual asset candidates
         run: |
+          set -euo pipefail
           bootstrap_args=()
           if [[ -n "${{ inputs.bootstrap_manifest }}" ]]; then
             bootstrap_args=(--bootstrap-manifest "${{ inputs.bootstrap_manifest }}")
           fi
           node scripts/assets/asset-manager.mjs \
+            --config "$ASSET_MANAGER_CONFIG_PATH" \
             --content "${{ inputs.content_file }}" \
             --dry-run "${{ inputs.dry_run }}" \
             --max-downloads "${{ inputs.max_downloads }}" \
@@ -117,6 +144,14 @@ jobs:
             --expected-bootstrap-assets "${{ inputs.expected_bootstrap_assets }}" \
             "${bootstrap_args[@]}" \
             --report asset-manager/reports/latest.json
+
+      - name: Remove controlled editorial trial config
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ "${ASSET_MANAGER_CONFIG_PATH:-}" == "$RUNNER_TEMP/"* ]]; then
+            rm -f "$ASSET_MANAGER_CONFIG_PATH"
+          fi
 
       - name: Upload dry-run report
         if: always() && inputs.dry_run == true
@@ -137,4 +172,3 @@ jobs:
             asset-manager/manifest.json
           if-no-files-found: error
           retention-days: 7
-
