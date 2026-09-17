@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { buildVisualLayout, visualDebugPlan } from "./visual-layout.mjs";
 
 const [mode, definitionPath, outputPath = "output", sceneMediaPath] = process.argv.slice(2);
 
@@ -57,11 +58,33 @@ function escapeFilter(value) {
     .replaceAll(",", "\\,");
 }
 
-function prepare() {
-  const sceneMedia = sceneMediaInputs();
-  writeFileSync(resolve(outputDir, "narration.txt"), `${definition.narration}\n`, "utf8");
+function wrapCaption(value, maximumLineLength = 38) {
+  const words = String(value).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  const lines = [""];
+  for (const word of words) {
+    const current = lines.at(-1);
+    if (current && `${current} ${word}`.length > maximumLineLength && lines.length < 2) lines.push(word);
+    else lines[lines.length - 1] = current ? `${current} ${word}` : word;
+  }
+  return lines.join("\n");
+}
 
-  const assLines = [
+function captionText(scene, v41) {
+  const caption = v41 ? wrapCaption(scene.caption) : scene.caption;
+  const emphasis = scene.caption_emphasis;
+  if (v41 && typeof emphasis === "string" && emphasis && caption.includes(emphasis)) {
+    const [before, after] = caption.split(emphasis, 2);
+    return `${escapeAss(before)}{\\c&HFF6B00&}${escapeAss(emphasis)}{\\c&HFFFFFF&}${escapeAss(after ?? "")}`;
+  }
+  return escapeAss(caption);
+}
+
+function captionLines(v41) {
+  const style = v41
+    ? "Style: Caption,DejaVu Sans,54,&H00FFFFFF,&H00FF6B00,&HDD07121F,&HAA07121F,1,0,0,0,100,100,0,0,1,3,0,2,72,72,300,1"
+    : "Style: Caption,DejaVu Sans,48,&H00FFFFFF,&H00006BFF,&HDD07121F,&HAA07121F,1,0,0,0,100,100,0,0,1,3,0,2,92,92,220,1";
+  return [
     "[Script Info]",
     "ScriptType: v4.00+",
     "PlayResX: 1080",
@@ -69,17 +92,14 @@ function prepare() {
     "",
     "[V4+ Styles]",
     "Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding",
-    "Style: Caption,DejaVu Sans,48,&H00FFFFFF,&H00006BFF,&HDD07121F,&HAA07121F,1,0,0,0,100,100,0,0,1,3,0,2,92,92,220,1",
+    style,
     "",
     "[Events]",
     "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text"
   ];
+}
 
-  for (const scene of definition.scenes) {
-    assLines.push(`Dialogue: 0,${assTimestamp(scene.start + 0.2)},${assTimestamp(scene.end - 0.2)},Caption,,0,0,0,,${escapeAss(scene.caption)}`);
-  }
-  writeFileSync(resolve(outputDir, "captions.ass"), `${assLines.join("\n")}\n`, "utf8");
-
+function legacyDraw() {
   const draw = [
     "drawbox=x=0:y=0:w=1080:h=1920:color=0x07121F:t=fill",
     "drawbox=x=0:y=0:w=1080:h=18:color=0x006BFF:t=fill",
@@ -116,16 +136,74 @@ function prepare() {
     `drawtext=fontfile=${subtitleFont}:text='${escapeFilter(definition.tagline)}':fontcolor=0xBFD7F5:fontsize=30:x=(w-text_w)/2:y=1500:enable='between(t\\,23.5\\,${duration})'`,
     `subtitles=${resolve(outputDir, "captions.ass").replaceAll("\\", "/")}:fontsdir=/usr/share/fonts/truetype/dejavu`
   );
+  return draw;
+}
 
-  const mediaFilters = [];
-  const hasSceneMedia = sceneMedia.assets.length > 0;
-  let canvasInput = "[0:v]";
-  const [baseBackground, ...foregroundDraw] = draw;
-  if (hasSceneMedia) {
-    // Keep the legacy opaque background behind selected V4 scene media.
-    mediaFilters.push(`${canvasInput}${baseBackground}[scene_media_base]`);
-    canvasInput = "[scene_media_base]";
+function v41Foreground(layouts) {
+  const draw = [
+    "drawbox=x=0:y=0:w=1080:h=8:color=0x006BFF:t=fill",
+    "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='PLAYECONOMY':fontcolor=0xD7E7FF:fontsize=24:x=140:y=112"
+  ];
+  for (const [index, scene] of definition.scenes.entries()) {
+    const layout = layouts[index];
+    const enabled = `between(t\\,${scene.start}\\,${scene.end})`;
+    const textEnabled = `between(t\\,${scene.start + 0.2}\\,${scene.end - 0.2})`;
+    draw.push(
+      `drawbox=x=72:y=238:w=96:h=8:color=0x006BFF:t=fill:enable='${enabled}'`,
+      `drawtext=fontfile=${font}:text='${escapeFilter(scene.eyebrow)}':fontcolor=0xBFD7F5:fontsize=30:x=72:y=275:enable='${textEnabled}'`,
+      `drawtext=fontfile=${font}:text='${escapeFilter(layout.title)}':fontcolor=white:fontsize=${layout.family === "company_logo" ? 92 : 64}:x=72:y=${layout.family === "company_logo" ? 560 : 330}:enable='${textEnabled}'`
+    );
+    if (layout.companyFallback) {
+      draw.push(`drawtext=fontfile=${subtitleFont}:text='${escapeFilter(scene.headline.slice(1).join(" "))}':fontcolor=0xD7E7FF:fontsize=42:x=72:y=680:enable='${textEnabled}'`);
+    }
+    if (layout.dataEnabled && typeof scene.data?.value === "number") {
+      draw.push(`drawtext=fontfile=${font}:text='${escapeFilter(String(scene.data.value))}':fontcolor=0x006BFF:fontsize=96:x=72:y=760:enable='${textEnabled}'`);
+    }
   }
+  draw.push(`subtitles=${resolve(outputDir, "captions.ass").replaceAll("\\", "/")}:fontsdir=/usr/share/fonts/truetype/dejavu`);
+  return draw;
+}
+
+function mediaFilter(inputIndex, label, layout) {
+  const increment = layout.family === "cover_product" ? "0.00015" : "0.00035";
+  const transform = layout.mediaTreatment === "contain"
+    ? "scale=900:1120:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x07121F"
+    : "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920";
+  return `[${inputIndex}:v]${transform},zoompan=z='min(zoom+${increment},${layout.motion.zoomEnd})':d=1:s=1080x1920:fps=30,setsar=1[${label}]`;
+}
+
+function prepare() {
+  const sceneMedia = sceneMediaInputs();
+  const hasSceneMedia = sceneMedia.assets.length > 0;
+  writeFileSync(resolve(outputDir, "narration.txt"), `${definition.narration}\n`, "utf8");
+  const assLines = captionLines(hasSceneMedia);
+  for (const scene of definition.scenes) {
+    assLines.push(`Dialogue: 0,${assTimestamp(scene.start + 0.2)},${assTimestamp(scene.end - 0.2)},Caption,,0,0,0,,${captionText(scene, hasSceneMedia)}`);
+  }
+  writeFileSync(resolve(outputDir, "captions.ass"), `${assLines.join("\n")}\n`, "utf8");
+  if (!hasSceneMedia) {
+    const draw = legacyDraw();
+    const graph = [
+      `[0:v]${draw.join(",")}[canvas]`,
+      "[1:v]scale=92:92,format=rgba[avatar]",
+      "[2:v]scale=620:-1,format=rgba[logo]",
+      "[canvas][avatar]overlay=72:78:enable='between(t,0,22.9)'[with_avatar]",
+      `[with_avatar][logo]overlay=(W-w)/2:760:enable='between(t,23,${duration})'[v]`
+    ].join(";\n");
+    writeFileSync(resolve(outputDir, "filtergraph.txt"), `${graph}\n`, "utf8");
+    return;
+  }
+
+  const sceneAssets = new Map(definition.scenes.map((scene) => [
+    scene.scene_id,
+    sceneMedia.scenes.has(scene.scene_id) ? { asset_id: sceneMedia.scenes.get(scene.scene_id) } : null
+  ]));
+  const layouts = visualDebugPlan({ scenes: definition.scenes, sceneAssets, duration });
+  writeFileSync(resolve(outputDir, "visual-layout.json"), `${JSON.stringify({ version: "4.1", scenes: layouts }, null, 2)}\n`, "utf8");
+
+  const endCard = layouts[0].endCard;
+  const mediaFilters = ["[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07121F:t=fill[scene_media_base]"];
+  let canvasInput = "[scene_media_base]";
   for (const [index, scene] of definition.scenes.entries()) {
     const assetId = sceneMedia.scenes.get(scene.scene_id);
     if (!assetId) continue;
@@ -133,19 +211,24 @@ function prepare() {
     const mediaLabel = `scene_media_${index}`;
     const compositeLabel = `scene_canvas_${index}`;
     mediaFilters.push(
-      `[${inputIndex}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[${mediaLabel}]`,
+      mediaFilter(inputIndex, mediaLabel, layouts[index]),
       `${canvasInput}[${mediaLabel}]overlay=0:0:enable='between(t\\,${scene.start}\\,${scene.end})'[${compositeLabel}]`
     );
     canvasInput = `[${compositeLabel}]`;
   }
-
+  const foreground = v41Foreground(layouts);
+  foreground.push(
+    `drawbox=x=0:y=0:w=1080:h=1920:color=0x000000:t=fill:enable='between(t\\,${endCard.start}\\,${endCard.end})'`,
+    `drawtext=fontfile=${font}:text='PLAYECONOMY':fontcolor=white:fontsize=58:x=(w-text_w)/2:y=1420:enable='between(t\\,${endCard.start + 0.3}\\,${endCard.end})'`,
+    `drawtext=fontfile=${subtitleFont}:text='${escapeFilter(definition.tagline)}':fontcolor=0xBFD7F5:fontsize=30:x=(w-text_w)/2:y=1500:enable='between(t\\,${endCard.start + 0.5}\\,${endCard.end})'`
+  );
   const graph = [
     ...mediaFilters,
-    `${canvasInput}${(hasSceneMedia ? foregroundDraw : draw).join(",")}[canvas]`,
-    "[1:v]scale=92:92,format=rgba[avatar]",
+    `${canvasInput}${foreground.join(",")}[canvas]`,
+    "[1:v]scale=52:52,format=rgba[avatar]",
     "[2:v]scale=620:-1,format=rgba[logo]",
-    "[canvas][avatar]overlay=72:78:enable='between(t,0,22.9)'[with_avatar]",
-    `[with_avatar][logo]overlay=(W-w)/2:760:enable='between(t,23,${duration})'[v]`
+    `[canvas][avatar]overlay=72:104:enable='between(t,0,${endCard.start - 0.1})'[with_avatar]`,
+    `[with_avatar][logo]overlay=(W-w)/2:760:enable='between(t,${endCard.start},${duration})'[v]`
   ].join(";\n");
   writeFileSync(resolve(outputDir, "filtergraph.txt"), `${graph}\n`, "utf8");
 }

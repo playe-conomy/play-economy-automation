@@ -13,6 +13,7 @@
 - V3.5 maps semantically suitable catalog assets to content scenes.
 - V3.6 stores the validated catalog and media in Google Drive, then hydrates an ephemeral runner manifest.
 - V4 reads that hydrated catalog, fetches only unique scene-selected media, verifies each SHA-256 and image decode, and passes local paths to V2 through `output/scene-media.json`.
+- When `scene-media.json` is present, V4.1 uses the pure `scripts/video/visual-layout.mjs` layer to resolve a deterministic visual family per scene: `media`, `cover_product`, `company_logo`, `data_economy`, or `brand`. It does not select assets or access Drive.
 - Google Drive is persistent catalog/media storage. The GitHub runner stores only selected ephemeral media. V2 remains Google-Drive-agnostic.
 - `.github/workflows/playeconomy-video-v4.yml` uploads the MP4, scene plan, scene-media manifest, validation reports and `ATTRIBUTION.md`; it does not publish downloaded source media.
 
@@ -22,6 +23,15 @@
 - `assets/brand/playeconomy-avatar.jpeg` is the supplied circular avatar variation.
 
 The renderer uses the avatar as a small in-video mark and shows the main logo in the closing frame. Do not redraw, replace or rescale the original source assets in the repository.
+
+## V4.1 visual layout
+
+- Legacy V2 invocation without `scene-media.json` retains its generated visual graph, including its existing 23–27 second end card.
+- V4.1 scene media uses a dark base, selected image treatment, minimal foreground typography, captions, then branding/end card. Media scenes use controlled fill/crop; product and company assets use fit/contain treatment to avoid destructive cropping.
+- The V4.1 renderer writes an ephemeral `output/visual-layout.json` debug plan with family, media treatment, motion, safe zones, branding mode, subtitle mode, and end-card timing. It is derived only from content plus local scene-media references.
+- Generic decorative bar charts and the large central dark box are not used in normal V4.1 scenes. Data graphics require explicit structured numeric `scene.data`; otherwise the renderer does not invent values.
+- V4.1 captions remain scene-timed. They use a conservative lower safe zone, compact wrapping, and optional electric-blue emphasis only when content explicitly provides `caption_emphasis`.
+- For V4.1 media mode, the end card is derived from the content duration and occupies at most the final two seconds. For a 27-second video it runs from 25 to 27 seconds.
 
 ## Add a topic
 
