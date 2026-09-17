@@ -128,11 +128,11 @@ export function resolveVisualFamily(scene, selectedAsset = null) {
 function motionFor(family, order = 0) {
   const variation = Math.abs(Number(order) || 0) % 3;
   if (family === "media") {
-    return { type: "zoompan", zoomStart: 1, zoomEnd: 1.02 + variation * 0.02, pan: variation === 1 ? "x" : variation === 2 ? "y" : "center" };
+    return { type: "zoompan", zoomStart: 1, zoomEnd: 1.02 + variation * 0.02 };
   }
-  if (family === "cover_product") return { type: "zoompan", zoomStart: 1, zoomEnd: 1.01 + variation * 0.01, pan: "center" };
-  if (family === "company_logo") return { type: "zoompan", zoomStart: 1, zoomEnd: 1.01, pan: "center" };
-  return { type: "static", zoomStart: 1, zoomEnd: 1, pan: "center" };
+  if (family === "cover_product") return { type: "zoompan", zoomStart: 1, zoomEnd: 1.01 + variation * 0.01 };
+  if (family === "company_logo") return { type: "zoompan", zoomStart: 1, zoomEnd: 1.01 };
+  return { type: "static", zoomStart: 1, zoomEnd: 1 };
 }
 
 export function endCardTiming(duration) {
@@ -145,10 +145,69 @@ export function endCardTiming(duration) {
   };
 }
 
+function beatBoundary(scene, captionSegments, effectiveEnd) {
+  const start = Number(scene.start);
+  const candidates = captionSegments
+    .map((segment) => Number(segment.start))
+    .filter((boundary) => boundary > start && boundary < effectiveEnd && boundary - start >= 1.8 && boundary - start <= 3.5);
+  return candidates[0] ?? start + (effectiveEnd - start) / 2;
+}
+
+function presentationFor(family, beatIndex, hasMedia, order) {
+  if (family === "media") {
+    if (beatIndex === 0) return "media_establish";
+    return Math.abs(Number(order) || 0) % 2 ? "media_reframe_x" : "media_reframe_y";
+  }
+  if (family === "cover_product") return beatIndex === 0 ? "cover_establish" : "cover_detail";
+  if (family === "company_logo") {
+    if (!hasMedia) return beatIndex === 0 ? "company_establish" : "company_supporting";
+    return beatIndex === 0 ? "company_establish" : "company_detail";
+  }
+  if (family === "data_economy") return beatIndex === 0 ? "data_primary" : "data_explanation";
+  return "brand_static";
+}
+
+function headlineStateFor(family, beatIndex, hasMedia) {
+  if (["media", "cover_product"].includes(family) && hasMedia) return beatIndex === 0 ? "visible" : "hidden";
+  if (family === "company_logo" && !hasMedia) return beatIndex === 0 ? "company_name" : "supporting_message";
+  if (family === "data_economy") return beatIndex === 0 ? "data_primary" : "data_explanation";
+  return family === "brand" ? "hidden" : "visible";
+}
+
+function beatMotion(family, presentation, order) {
+  if (family === "media") return { type: "zoompan", zoomStart: 1, zoomEnd: presentation === "media_establish" ? 1.018 : 1.022 + (Math.abs(Number(order) || 0) % 2) * 0.006 };
+  if (family === "cover_product") return { type: "zoompan", zoomStart: 1, zoomEnd: presentation === "cover_establish" ? 1.01 : 1.022 };
+  return { type: "static", zoomStart: 1, zoomEnd: 1 };
+}
+
+export function visualBeats({ scene, family, hasMedia, captionSegments, selectedAsset = null, order = 0, endCard }) {
+  const start = Number(scene.start);
+  const end = Number(scene.end);
+  const assetId = selectedAsset?.asset_id ?? null;
+  const endCardStart = Number(endCard?.start);
+  const effectiveEnd = Number.isFinite(endCardStart) && endCardStart < end ? endCardStart : end;
+  if (!Number.isFinite(start) || !Number.isFinite(effectiveEnd) || effectiveEnd <= start) return [];
+  const eligibleForTwoBeats = effectiveEnd - start >= 4 && family !== "brand";
+  const boundaries = eligibleForTwoBeats ? [start, beatBoundary(scene, captionSegments, effectiveEnd), effectiveEnd] : [start, effectiveEnd];
+  return boundaries.slice(0, -1).map((beatStart, index) => {
+    const presentation = presentationFor(family, index, hasMedia, order);
+    return {
+      start: beatStart,
+      end: boundaries[index + 1],
+      presentation,
+      headlineState: headlineStateFor(family, index, hasMedia),
+      asset_id: assetId,
+      motion: beatMotion(family, presentation, order)
+    };
+  });
+}
+
 export function buildVisualLayout({ scene, selectedAsset = null, order = 0, duration }) {
   const family = resolveVisualFamily(scene, selectedAsset);
   const hasMedia = Boolean(selectedAsset);
   const containsMedia = family === "cover_product" || family === "company_logo";
+  const captionSegments = timedCaptionSegments(scene);
+  const endCard = endCardTiming(duration);
   return {
     family,
     hasMedia,
@@ -156,9 +215,10 @@ export function buildVisualLayout({ scene, selectedAsset = null, order = 0, dura
     motion: hasMedia ? motionFor(family, order) : motionFor("brand", order),
     brandingMode: family === "brand" ? "large" : "small",
     subtitleMode: "scene_caption",
-    captionSegments: timedCaptionSegments(scene),
+    captionSegments,
+    visualBeats: visualBeats({ scene, family, hasMedia, captionSegments, selectedAsset, order, endCard }),
     safeZones: SAFE_ZONES,
-    endCard: endCardTiming(duration),
+    endCard,
     dataEnabled: family === "data_economy" && hasStructuredNumericData(scene),
     companyFallback: family === "company_logo" && !hasMedia,
     title: family === "company_logo" && !hasMedia ? (scene.target_entity ?? scene.headline?.[0] ?? "") : (scene.headline?.[0] ?? "")
@@ -172,3 +232,4 @@ export function visualDebugPlan({ scenes, sceneAssets = new Map(), duration, tra
     normalBranding: normalBrandingLayout({ transparentLogoAvailable })
   }));
 }
+

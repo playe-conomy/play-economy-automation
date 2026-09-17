@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SAFE_ZONES, buildVisualLayout, endCardTiming, normalBrandingLayout, resolveVisualFamily, segmentCaption, timedCaptionSegments, visualDebugPlan, wrapCaptionLines } from "./visual-layout.mjs";
+import { SAFE_ZONES, buildVisualLayout, endCardTiming, normalBrandingLayout, resolveVisualFamily, segmentCaption, timedCaptionSegments, visualBeats, visualDebugPlan, wrapCaptionLines } from "./visual-layout.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const definition = JSON.parse(await readFile(resolve(repositoryRoot, "content/guitar-hero.json"), "utf8"));
@@ -63,4 +63,58 @@ assert.deepEqual(normalBrandingLayout({ transparentLogoAvailable: true }), { mod
 assert.equal(normalBrandingLayout({ transparentLogoAvailable: false }).mode, "avatar_fallback", "non-transparent logos fall back gracefully to the existing avatar mark");
 assert.equal(visualDebugPlan({ scenes: definition.scenes, duration: 27, transparentLogoAvailable: true })[0].captionSegments[0].start, 0, "debug plans expose phrase timing");
 
+const pacedIdentity = buildVisualLayout({ scene: definition.scenes[0], selectedAsset: { asset_id: "identity", role: "cover_art" }, order: 0, duration: 27 });
+const identityCaptions = timedCaptionSegments(definition.scenes[0]);
+assert.deepEqual(pacedIdentity.captionSegments, identityCaptions, "visual beats do not rewrite caption segments");
+assert.deepEqual(
+  pacedIdentity.visualBeats.map(({ start, end, presentation, headlineState, asset_id }) => ({ start, end, presentation, headlineState, asset_id })),
+  [
+    { start: 0, end: identityCaptions[1].start, presentation: "cover_establish", headlineState: "visible", asset_id: "identity" },
+    { start: identityCaptions[1].start, end: 5, presentation: "cover_detail", headlineState: "hidden", asset_id: "identity" }
+  ],
+  "cover/product uses the suitable caption boundary for deterministic two-beat pacing"
+);
+for (const [index, beat] of pacedIdentity.visualBeats.entries()) {
+  assert.ok(beat.start >= definition.scenes[0].start && beat.end <= definition.scenes[0].end, "beats stay inside their scene");
+  if (index > 0) assert.equal(pacedIdentity.visualBeats[index - 1].end, beat.start, "beats are continuous without gaps or overlaps");
+}
+assert.deepEqual(pacedIdentity.visualBeats, buildVisualLayout({ scene: definition.scenes[0], selectedAsset: { asset_id: "identity", role: "cover_art" }, order: 0, duration: 27 }).visualBeats, "visual beats are deterministic");
+
+const pacedGameplay = buildVisualLayout({ scene: definition.scenes[1], selectedAsset: { asset_id: "gameplay", role: "gameplay" }, order: 1, duration: 27 });
+assert.deepEqual(pacedGameplay.visualBeats.map((beat) => [beat.start, beat.end]), [[5, 7.5], [7.5, 10]], "one-caption media scene uses its deterministic midpoint");
+assert.deepEqual(pacedGameplay.visualBeats.map((beat) => beat.headlineState), ["visible", "hidden"], "media headlines only appear during the establishing beat");
+
+const pacedCompany = buildVisualLayout({ scene: definition.scenes[2], order: 2, duration: 27 });
+assert.deepEqual(pacedCompany.visualBeats.map((beat) => [beat.start, beat.end, beat.presentation, beat.headlineState]), [[10, 12.5, "company_establish", "company_name"], [12.5, 15, "company_supporting", "supporting_message"]], "no-asset company fallback receives its two safe typography states");
+
+const pacedRock = buildVisualLayout({ scene: definition.scenes[3], selectedAsset: { asset_id: "rock", role: "contextual_broll" }, order: 3, duration: 27 });
+assert.equal(pacedRock.visualBeats[0].end, timedCaptionSegments(definition.scenes[3])[1].start, "rock scene reuses its suitable caption boundary");
+assert.deepEqual(pacedRock.visualBeats.map((beat) => beat.headlineState), ["visible", "hidden"], "media reframe hides the headline");
+
+const pacedConclusion = buildVisualLayout({ scene: definition.scenes[4], selectedAsset: { asset_id: "conclusion", role: "official_art" }, order: 4, duration: 27 });
+assert.deepEqual(pacedConclusion.visualBeats.map((beat) => [beat.start, beat.end]), [[21, 23], [23, 25]], "conclusion visual beats stop at the generic end-card boundary");
+assert.ok(pacedConclusion.visualBeats.every((beat) => beat.end <= pacedConclusion.endCard.start), "no normal conclusion beat overlaps the end card");
+assert.ok(pacedConclusion.visualBeats.every((beat) => beat.motion.zoomStart === 1), "every media beat declares motion that starts locally from its own beginning");
+const preEndCardScene = { scene_id: "pre-end-card", start: 6, end: 10, caption: "Una sola frase." };
+assert.deepEqual(
+  visualBeats({ scene: preEndCardScene, family: "media", hasMedia: true, captionSegments: timedCaptionSegments(preEndCardScene), endCard: { start: 8, end: 10 } }).map((beat) => [beat.start, beat.end]),
+  [[6, 8]],
+  "a short effective pre-end-card interval degrades safely to one beat"
+);
+const coveredScene = { scene_id: "covered", start: 8, end: 10, caption: "No visible." };
+assert.deepEqual(
+  visualBeats({ scene: coveredScene, family: "media", hasMedia: true, captionSegments: timedCaptionSegments(coveredScene), endCard: { start: 8, end: 10 } }),
+  [],
+  "a scene fully covered by the end card creates no zero or negative beat"
+);
+const clampedBoundaryScene = { scene_id: "clamped-boundary", start: 0, end: 10, caption: "No importa." };
+assert.deepEqual(
+  visualBeats({ scene: clampedBoundaryScene, family: "media", hasMedia: true, captionSegments: [{ start: 0 }, { start: 4.1 }], endCard: { start: 4, end: 10 } }).map((beat) => [beat.start, beat.end]),
+  [[0, 2], [2, 4]],
+  "a caption boundary outside the effective visual interval cannot create an invalid beat"
+);
+assert.deepEqual(pacedGameplay.visualBeats.map((beat) => [beat.start, beat.end]), [[5, 7.5], [7.5, 10]], "a scene outside the end card remains unchanged");
+assert.equal(visualBeats({ scene: { start: 0, end: 2, caption: "Corta." }, family: "brand", hasMedia: false, captionSegments: [], endCard: { start: 3, end: 5 } }).length, 1, "short brand-only scenes do not gain unnecessary beats");
+
 console.log("visual layout tests passed");
+

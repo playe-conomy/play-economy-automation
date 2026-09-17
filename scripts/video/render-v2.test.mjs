@@ -58,8 +58,8 @@ try {
 
   const baseBackground = "drawbox=x=0:y=0:w=1080:h=1920:color=0x07121F:t=fill";
   const blackEndCard = "drawbox=x=0:y=0:w=1080:h=1920:color=0x000000:t=fill:enable='between(t\\,25\\,27)'";
-  const firstMediaInput = mediaGraph.indexOf("[scene_media_0]");
-  const lastMediaOverlay = mediaGraph.indexOf("[scene_canvas_4]");
+  const firstMediaInput = mediaGraph.indexOf("[scene_media_0_0]");
+  const lastMediaOverlay = mediaGraph.indexOf("[scene_canvas_4_1]");
   assert.ok(mediaGraph.indexOf(baseBackground) < firstMediaInput, "V4 draws its opaque base before selected media");
   assert.ok(
     mediaGraph.indexOf(baseBackground, firstMediaInput) === -1,
@@ -68,12 +68,23 @@ try {
   assert.match(mediaGraph, /scale=900:1120:force_original_aspect_ratio=decrease,pad=1080:1920/, "cover/product media fits inside the canvas");
   assert.match(mediaGraph, /scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920/, "media scenes retain controlled fill/crop");
   assert.match(mediaGraph, /zoompan=z='min\(zoom\+0\.000/, "V4.1 media receives deterministic native FFmpeg motion");
-  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,0\\,5\)'/, "identity media is active from 0 to 5");
-  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,5\\,10\)'/, "gameplay media is active from 5 to 10");
+  assert.match(mediaGraph, /trim=start=0:end=2\.742857142857143,setpts=PTS-STARTPTS/, "identity Beat A starts its media motion at the local beat origin");
+  assert.match(mediaGraph, /trim=start=2\.742857142857143:end=5,setpts=PTS-STARTPTS/, "identity Beat B receives a separate local-time presentation");
+  assert.match(mediaGraph, /trim=start=5:end=7\.5,setpts=PTS-STARTPTS/, "gameplay Beat A starts motion locally instead of at global render time");
+  assert.match(mediaGraph, /trim=start=7\.5:end=10,setpts=PTS-STARTPTS/, "gameplay Beat B does not inherit advanced zoom from Beat A");
+  assert.match(mediaGraph, /setpts=PTS\+5\/TB\[scene_media_1_0\]/, "later media is re-timestamped to its own scene time after local motion");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,0\\,2\.742857142857143\)'/, "identity establishing media is active for Beat A");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,2\.742857142857143\\,5\)'/, "identity detail media is active for Beat B");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,5\\,7\.5\)'/, "gameplay establishing media is active for Beat A");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,7\.5\\,10\)'/, "gameplay reframed media is active for Beat B");
   assert.ok(!mediaGraph.includes("overlay=0:0:enable='between(t\\,10\\,15)'"), "the no_asset Activision scene receives no media overlay");
-  assert.match(mediaGraph, /text='Activision'.*between\(t\\,10\.2\\,14\.8\)/, "the no_asset Activision scene receives a company-specific generated fallback");
-  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,15\\,21\)'/, "rock media is active from 15 to 21");
-  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,21\\,27\)'/, "conclusion media is active from 21 to 27 before foreground layers");
+  assert.match(mediaGraph, /text='Activision'.*between\(t\\,10\.2\\,12\.4\)/, "the no_asset Activision scene keeps its company-name establishing fallback");
+  assert.match(mediaGraph, /text='APROVECHÓ EL MOMENTO'.*between\(t\\,12\.6\\,14\.8\)/, "the no_asset Activision scene switches to its supporting-message state");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,15\\,18\.314285714285713\)'/, "rock media starts with its establishing beat");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,18\.314285714285713\\,21\)'/, "rock media receives a deterministic second presentation");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,21\\,23\)'/, "conclusion establishing media is active from 21 to 23");
+  assert.match(mediaGraph, /overlay=0:0:enable='between\(t\\,23\\,25\)'/, "conclusion detail ends when the unchanged end card takes ownership");
+  assert.doesNotMatch(mediaGraph, /scene_media_4_\d+\]overlay=0:0:enable='between\(t\\,25\\,27\)'/, "no normal conclusion media branch renders during the end card");
   assert.ok(!mediaGraph.includes("drawbox=x=72:y=990"), "generic central dark boxes are absent in V4.1 media mode");
   assert.ok(!mediaGraph.includes("drawbox=x=72:y=1125:w=90"), "generic decorative charts are absent in V4.1 media mode");
   assert.match(mediaGraph, /\[2:v\]scale=136:-1,format=rgba\[normal_brand\]/, "a transparent official logo is preserved as an RGBA normal-scene overlay");
@@ -83,6 +94,9 @@ try {
   assert.ok((mediaCaptions.match(/^Dialogue:/gm) ?? []).length > 5, "V4.1.1 emits phrase-level caption events instead of one static event per scene");
   assert.ok(!mediaCaptions.includes("{\\c&HFF6B00&}"), "captions do not invent blue semantic emphasis without explicit metadata");
   assert.ok(!mediaGraph.includes("text='CONVERTIDO'"), "normal V4.1 scenes do not repeat the legacy three-line headline stack");
+  assert.match(mediaGraph, /text='PLÁSTICO'.*between\(t\\,0\.2\\,2\.642857142857143\)/, "cover headline is visible only during its establishing beat");
+  assert.doesNotMatch(mediaGraph, /text='PLÁSTICO'.*between\(t\\,2\.742857142857143\\,5\)/, "cover detail beat does not retain the headline");
+  assert.match(mediaGraph, /text='JUEGOS \+'.*between\(t\\,5\.2\\,7\.4\)/, "media headline is visible during its establishing beat only");
   assert.ok(
     mediaGraph.indexOf(blackEndCard) > lastMediaOverlay,
     "the V4.1 end card remains downstream and begins at 25, leaving conclusion media visible from 21 to 25"
@@ -102,6 +116,24 @@ try {
   assert.equal(visualLayout.transparent_logo_available, true, "debug output records transparent official branding availability");
   assert.equal(visualLayout.scenes[0].captionSegments[0].start, 0, "debug output includes phrase-level caption timing");
   assert.equal(visualLayout.scenes.at(-1).captionSegments.at(-1).end, 27, "debug caption timing reaches the final scene end");
+  assert.deepEqual(visualLayout.scenes[0].visualBeats.map((beat) => [beat.start, beat.end]), [[0, 2.742857142857143], [2.742857142857143, 5]], "debug output exposes the identity visual beats");
+  assert.deepEqual(visualLayout.scenes.at(-1).visualBeats.map((beat) => [beat.start, beat.end]), [[21, 23], [23, 25]], "debug output gives conclusion media clean ownership before the end card");
+
+  const sharedSceneMediaPath = join(testDirectory, "shared-scene-media.json");
+  await writeFile(sharedSceneMediaPath, JSON.stringify({
+    version: "4",
+    scenes: {
+      "guitar-hero-identity": { asset_id: "identity", media_type: "image", local_path: imagePaths.identity },
+      "guitar-hero-gameplay": { asset_id: "gameplay", media_type: "image", local_path: imagePaths.gameplay },
+      "rock-culture": { asset_id: "rock", media_type: "image", local_path: imagePaths.rock },
+      "guitar-hero-conclusion": { asset_id: "identity", media_type: "image", local_path: imagePaths.identity }
+    }
+  }));
+  const sharedOutput = join(testDirectory, "shared-media");
+  await prepare(sharedOutput, sharedSceneMediaPath, "shared-media");
+  const sharedGraph = await readFile(join(sharedOutput, "filtergraph.txt"), "utf8");
+  assert.match(sharedGraph, /\[4:v\]split=4\[asset_media_1_0\]\[asset_media_1_1\]\[asset_media_1_2\]\[asset_media_1_3\]/, "one unique local input fans out safely to all four same-asset beat uses across scenes");
+  assert.ok(!sharedGraph.includes("[6:v]"), "same-asset scene reuse does not add another renderer media input");
 
   const emphasizedContent = JSON.parse(await readFile(contentPath, "utf8"));
   emphasizedContent.scenes[0].caption_emphasis = "negocio";
@@ -117,4 +149,5 @@ try {
 }
 
 console.log("render V2 V4 compatibility tests passed");
+
 

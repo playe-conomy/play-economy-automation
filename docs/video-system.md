@@ -34,6 +34,9 @@ The renderer uses the avatar as a small in-video mark and shows the main logo in
 - For V4.1 media mode, the end card is derived from the content duration and occupies at most the final two seconds. For a 27-second video it runs from 25 to 27 seconds.
 - V4.1.1 splits captions into deterministic phrase events using existing caption text and scene duration only. Phrase timing is weighted by word count, has no gaps or overlaps, and does not attempt speech or word-level alignment.
 - In normal V4.1.1 scenes, the official logo is used as a small RGBA overlay only when it contains real transparent pixels. Otherwise rendering falls back to the existing avatar mark; source brand files are never altered. End-card branding remains unchanged.
+- V4.2 adds ephemeral `visualBeats` to the local visual-layout debug plan. Eligible scenes receive at most two continuous presentations, preferring an existing caption boundary 1.8–3.5 seconds into the scene and otherwise using a deterministic midpoint. When a scene overlaps the end card, its normal beats end at the end-card start. Caption segmentation itself is unchanged.
+- V4.2 gives selected local media a conservative establishing and detail/reframe presentation every roughly 2–3 seconds. Each beat trims and re-timestamps its FFmpeg branch, so motion begins when that beat is visible rather than at global render time.
+- A local image can fan out through FFmpeg `split` for multiple beats or scenes without another Drive read, download, mapper assignment, or persistent catalog change. `visualBeats` and their media references exist only in runner output.
 
 ## Add a topic
 
@@ -47,4 +50,5 @@ The current visual motor uses local FFmpeg shapes, charts, typography, captions 
 ## Limits
 
 The V2 visual language remains intentionally local and reliable: it does not include automatic fact checking, music, or social publishing. V4 accepts verified images only; selected video media fails closed until explicit renderer support is added.
+
 

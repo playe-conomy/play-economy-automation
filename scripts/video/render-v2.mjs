@@ -197,13 +197,23 @@ function v41Foreground(layouts) {
     const layout = layouts[index];
     const enabled = `between(t\\,${scene.start}\\,${scene.end})`;
     const textEnabled = `between(t\\,${scene.start + 0.2}\\,${scene.end - 0.2})`;
+    const headlineBeats = layout.visualBeats.filter((beat) => beat.headlineState === "visible");
     draw.push(
       `drawbox=x=72:y=238:w=96:h=8:color=0x006BFF:t=fill:enable='${enabled}'`,
-      `drawtext=fontfile=${font}:text='${escapeFilter(scene.eyebrow)}':fontcolor=0xBFD7F5:fontsize=30:x=72:y=275:enable='${textEnabled}'`,
-      `drawtext=fontfile=${font}:text='${escapeFilter(layout.title)}':fontcolor=white:fontsize=${layout.family === "company_logo" ? 92 : 64}:x=72:y=${layout.family === "company_logo" ? 560 : 330}:enable='${textEnabled}'`
+      `drawtext=fontfile=${font}:text='${escapeFilter(scene.eyebrow)}':fontcolor=0xBFD7F5:fontsize=30:x=72:y=275:enable='${textEnabled}'`
     );
-    if (layout.companyFallback) {
-      draw.push(`drawtext=fontfile=${subtitleFont}:text='${escapeFilter(scene.headline.slice(1).join(" "))}':fontcolor=0xD7E7FF:fontsize=42:x=72:y=680:enable='${textEnabled}'`);
+    if (["media", "cover_product"].includes(layout.family) && layout.hasMedia) {
+      for (const beat of headlineBeats) {
+        const headlineEnd = Math.min(beat.end - 0.1, scene.end - 0.2);
+        draw.push(`drawtext=fontfile=${font}:text='${escapeFilter(layout.title)}':fontcolor=white:fontsize=64:x=72:y=330:enable='between(t\\,${beat.start + 0.2}\\,${headlineEnd})'`);
+      }
+    } else if (layout.companyFallback) {
+      const nameBeat = layout.visualBeats.find((beat) => beat.headlineState === "company_name");
+      const supportingBeat = layout.visualBeats.find((beat) => beat.headlineState === "supporting_message");
+      if (nameBeat) draw.push(`drawtext=fontfile=${font}:text='${escapeFilter(layout.title)}':fontcolor=white:fontsize=92:x=72:y=560:enable='between(t\\,${nameBeat.start + 0.2}\\,${nameBeat.end - 0.1})'`);
+      if (supportingBeat) draw.push(`drawtext=fontfile=${subtitleFont}:text='${escapeFilter(scene.headline.slice(1).join(" "))}':fontcolor=0xD7E7FF:fontsize=42:x=72:y=680:enable='between(t\\,${supportingBeat.start + 0.1}\\,${supportingBeat.end - 0.2})'`);
+    } else {
+      draw.push(`drawtext=fontfile=${font}:text='${escapeFilter(layout.title)}':fontcolor=white:fontsize=${layout.family === "company_logo" ? 92 : 64}:x=72:y=${layout.family === "company_logo" ? 560 : 330}:enable='${textEnabled}'`);
     }
     if (layout.dataEnabled && typeof scene.data?.value === "number") {
       draw.push(`drawtext=fontfile=${font}:text='${escapeFilter(String(scene.data.value))}':fontcolor=0x006BFF:fontsize=96:x=72:y=760:enable='${textEnabled}'`);
@@ -213,12 +223,24 @@ function v41Foreground(layouts) {
   return draw;
 }
 
-function mediaFilter(inputIndex, label, layout) {
-  const increment = layout.family === "cover_product" ? "0.00015" : "0.00035";
-  const transform = layout.mediaTreatment === "contain"
+function mediaTransform(layout, beat) {
+  if (beat.presentation === "cover_detail") {
+    return "scale=1020:1320:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x07121F";
+  }
+  if (beat.presentation === "media_reframe_x") {
+    return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-ow)*0.72:(ih-oh)*0.5";
+  }
+  if (beat.presentation === "media_reframe_y") {
+    return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-ow)*0.5:(ih-oh)*0.7";
+  }
+  return layout.mediaTreatment === "contain"
     ? "scale=900:1120:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x07121F"
     : "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920";
-  return `[${inputIndex}:v]${transform},zoompan=z='min(zoom+${increment},${layout.motion.zoomEnd})':d=1:s=1080x1920:fps=30,setsar=1[${label}]`;
+}
+
+function mediaFilter(inputLabel, label, layout, beat) {
+  const increment = layout.family === "cover_product" ? "0.00015" : "0.00025";
+  return `${inputLabel}trim=start=${beat.start}:end=${beat.end},setpts=PTS-STARTPTS,${mediaTransform(layout, beat)},zoompan=z='min(zoom+${increment},${beat.motion.zoomEnd})':d=1:s=1080x1920:fps=30,setsar=1,setpts=PTS+${beat.start}/TB[${label}]`;
 }
 
 function prepare() {
@@ -257,16 +279,39 @@ function prepare() {
   const endCard = layouts[0].endCard;
   const normalBranding = layouts[0].normalBranding;
   const mediaFilters = ["[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07121F:t=fill[scene_media_base]"];
-  let canvasInput = "[scene_media_base]";
-  for (const [index, scene] of definition.scenes.entries()) {
+  const mediaUses = [];
+  for (const [sceneIndex, scene] of definition.scenes.entries()) {
     const assetId = sceneMedia.scenes.get(scene.scene_id);
     if (!assetId) continue;
-    const inputIndex = 3 + sceneMedia.assets.findIndex((asset) => asset.asset_id === assetId);
-    const mediaLabel = `scene_media_${index}`;
-    const compositeLabel = `scene_canvas_${index}`;
+    for (const [beatIndex, beat] of layouts[sceneIndex].visualBeats.entries()) {
+      mediaUses.push({ assetId, sceneIndex, scene, beatIndex, beat, layout: layouts[sceneIndex] });
+    }
+  }
+  const usesByAsset = new Map();
+  for (const use of mediaUses) {
+    const uses = usesByAsset.get(use.assetId) ?? [];
+    uses.push(use);
+    usesByAsset.set(use.assetId, uses);
+  }
+  for (const [assetIndex, asset] of sceneMedia.assets.entries()) {
+    const uses = usesByAsset.get(asset.asset_id) ?? [];
+    if (uses.length <= 1) {
+      if (uses.length === 1) uses[0].inputLabel = `[${3 + assetIndex}:v]`;
+      continue;
+    }
+    const labels = uses.map((_, useIndex) => `[asset_media_${assetIndex}_${useIndex}]`);
+    mediaFilters.push(`[${3 + assetIndex}:v]split=${uses.length}${labels.join("")}`);
+    uses.forEach((use, useIndex) => {
+      use.inputLabel = labels[useIndex];
+    });
+  }
+  let canvasInput = "[scene_media_base]";
+  for (const use of mediaUses) {
+    const mediaLabel = `scene_media_${use.sceneIndex}_${use.beatIndex}`;
+    const compositeLabel = `scene_canvas_${use.sceneIndex}_${use.beatIndex}`;
     mediaFilters.push(
-      mediaFilter(inputIndex, mediaLabel, layouts[index]),
-      `${canvasInput}[${mediaLabel}]overlay=0:0:enable='between(t\\,${scene.start}\\,${scene.end})'[${compositeLabel}]`
+      mediaFilter(use.inputLabel, mediaLabel, use.layout, use.beat),
+      `${canvasInput}[${mediaLabel}]overlay=0:0:enable='between(t\\,${use.beat.start}\\,${use.beat.end})'[${compositeLabel}]`
     );
     canvasInput = `[${compositeLabel}]`;
   }
@@ -315,4 +360,5 @@ if (mode === "prepare") prepare();
 if (mode === "render") render();
 
 console.log(`${mode}: ${basename(definitionPath)}`);
+
 
