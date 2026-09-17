@@ -1,0 +1,112 @@
+name: PlayEconomy audio voice review
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-voice-review:
+    name: Generate comparable Edge TTS samples
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Edge TTS and FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --disable-pip-version-check edge-tts
+          ffprobe -version
+
+      - name: Extract Guitar Hero narration
+        run: |
+          mkdir -p outputs/audio-voice-review
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+
+          const content = JSON.parse(await readFile('content/guitar-hero.json', 'utf8'));
+          if (typeof content.narration !== 'string' || content.narration.trim() === '') {
+            throw new Error('content/guitar-hero.json must contain a non-empty narration string.');
+          }
+          await writeFile('outputs/audio-voice-review/narration.txt', `${content.narration}\n`, 'utf8');
+          NODE
+
+      - name: Generate comparable voice samples
+        run: |
+          output_dir=outputs/audio-voice-review
+          narration_file="$output_dir/narration.txt"
+
+          edge-tts --voice es-CO-GonzaloNeural --rate '+0%' --pitch '+0Hz' --volume '+0%' --file "$narration_file" --write-media "$output_dir/01-current-gonzalo.mp3"
+          edge-tts --voice es-CO-GonzaloNeural --rate '-5%' --pitch '+0Hz' --volume '+0%' --file "$narration_file" --write-media "$output_dir/02-gonzalo-slower.mp3"
+          edge-tts --voice es-MX-JorgeNeural --rate '-3%' --pitch '+0Hz' --volume '+0%' --file "$narration_file" --write-media "$output_dir/03-jorge.mp3"
+          edge-tts --voice es-US-AlonsoNeural --rate '-3%' --pitch '+0Hz' --volume '+0%' --file "$narration_file" --write-media "$output_dir/04-alonso.mp3"
+          edge-tts --voice es-AR-TomasNeural --rate '-3%' --pitch '+0Hz' --volume '+0%' --file "$narration_file" --write-media "$output_dir/05-tomas.mp3"
+          edge-tts --voice es-CO-SalomeNeural --rate '-3%' --pitch '+0Hz' --volume '+0%' --file "$narration_file" --write-media "$output_dir/06-salome.mp3"
+
+      - name: Validate samples and create comparison manifest
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
+
+          const outputDir = 'outputs/audio-voice-review';
+          const narration = (await readFile(`${outputDir}/narration.txt`, 'utf8')).trim();
+          const samples = [
+            { number: 1, filename: '01-current-gonzalo.mp3', voice: 'es-CO-GonzaloNeural', locale: 'es-CO', rate: '+0%', pitch: '+0Hz', volume: '+0%' },
+            { number: 2, filename: '02-gonzalo-slower.mp3', voice: 'es-CO-GonzaloNeural', locale: 'es-CO', rate: '-5%', pitch: '+0Hz', volume: '+0%' },
+            { number: 3, filename: '03-jorge.mp3', voice: 'es-MX-JorgeNeural', locale: 'es-MX', rate: '-3%', pitch: '+0Hz', volume: '+0%' },
+            { number: 4, filename: '04-alonso.mp3', voice: 'es-US-AlonsoNeural', locale: 'es-US', rate: '-3%', pitch: '+0Hz', volume: '+0%' },
+            { number: 5, filename: '05-tomas.mp3', voice: 'es-AR-TomasNeural', locale: 'es-AR', rate: '-3%', pitch: '+0Hz', volume: '+0%' },
+            { number: 6, filename: '06-salome.mp3', voice: 'es-CO-SalomeNeural', locale: 'es-CO', rate: '-3%', pitch: '+0Hz', volume: '+0%' },
+          ];
+
+          const mp3Files = (await readdir(outputDir)).filter((name) => name.endsWith('.mp3')).sort();
+          const expectedFiles = samples.map((sample) => sample.filename).sort();
+          if (mp3Files.length !== 6 || mp3Files.join('\n') !== expectedFiles.join('\n')) {
+            throw new Error('Expected exactly the six configured MP3 files.');
+          }
+
+          for (const sample of samples) {
+            const path = `${outputDir}/${sample.filename}`;
+            if ((await stat(path)).size === 0) {
+              throw new Error(`${sample.filename} is empty.`);
+            }
+            const probe = JSON.parse(execFileSync('ffprobe', [
+              '-v', 'error', '-show_entries', 'format=duration:stream=codec_type',
+              '-of', 'json', path,
+            ], { encoding: 'utf8' }));
+            if (!probe.streams?.some((stream) => stream.codec_type === 'audio')) {
+              throw new Error(`${sample.filename} is not recognized as audio.`);
+            }
+            const durationSeconds = Number(probe.format?.duration);
+            if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+              throw new Error(`${sample.filename} has no valid duration.`);
+            }
+            sample.duration_seconds = durationSeconds;
+            sample.narration = narration;
+          }
+
+          if (samples.length !== 6 || new Set(samples.map((sample) => sample.narration)).size !== 1) {
+            throw new Error('Expected exactly six samples using identical narration.');
+          }
+          await writeFile(`${outputDir}/comparison.json`, `${JSON.stringify({ samples }, null, 2)}\n`, 'utf8');
+          await unlink(`${outputDir}/narration.txt`);
+          NODE
+
+      - name: Upload voice review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: playeconomy-audio-voice-review
+          path: outputs/audio-voice-review/
+          if-no-files-found: error
+
