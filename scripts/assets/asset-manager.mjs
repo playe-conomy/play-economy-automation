@@ -25,7 +25,7 @@ const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downl
 let manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
 const drive = driveConfiguration();
-const report = { manager: "PlayEconomy Asset Manager V3.7.1", dry_run: dryRun, topic: content.id, limits, rights: { copyrighted_editorial_enabled: rightsConfig.copyrighted_editorial_enabled === true, allow_copyrighted_editorial: allowCopyrightedEditorial, effective_copyrighted_editorial_permission: rightsConfig.copyrighted_editorial_enabled === true && allowCopyrightedEditorial }, coverage: { requirements: [], planned_queries: [], gaps: [] }, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, bootstrap: { bootstrap_only: bootstrapOnly, expected_assets: expectedBootstrapAssets, imported: 0, skipped: 0, conflicts: 0, conflict_details: [], catalog_previously_existed: false, catalog_created: false, catalog_drive_file_id: null, readback_validation: "not_requested", persistent_asset_count: 0, discovery_executed: false, downloads_executed: false, uploads_executed: false }, errors: [], fallback: "editorial_v2" };
+const report = { manager: "PlayEconomy Asset Manager V3.7.1", dry_run: dryRun, topic: content.id, limits, rights: { copyrighted_editorial_enabled: rightsConfig.copyrighted_editorial_enabled === true, allow_copyrighted_editorial: allowCopyrightedEditorial, effective_copyrighted_editorial_permission: rightsConfig.copyrighted_editorial_enabled === true && allowCopyrightedEditorial }, editorial_trial: { activision_games_blog_activated: false, activision_games_blog_article_requests: 0, activision_games_blog_media_preflights: 0, activision_games_blog_source_failures: 0, catalog_version_before: null, catalog_version_after: null }, coverage: { requirements: [], planned_queries: [], gaps: [] }, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, bootstrap: { bootstrap_only: bootstrapOnly, expected_assets: expectedBootstrapAssets, imported: 0, skipped: 0, conflicts: 0, conflict_details: [], catalog_previously_existed: false, catalog_created: false, catalog_drive_file_id: null, readback_validation: "not_requested", persistent_asset_count: 0, discovery_executed: false, downloads_executed: false, uploads_executed: false }, errors: [], fallback: "editorial_v2" };
 let driveReady = false;
 let catalogSession = null;
 
@@ -136,6 +136,8 @@ if (drive.configured) {
         bootstrap: catalogSession.bootstrap,
         final_persistent_asset_count: manifest.assets.length
       };
+      report.editorial_trial.catalog_version_before = catalogSession.exists ? catalogSession.catalog.catalog_version : null;
+      if (dryRun) report.editorial_trial.catalog_version_after = report.editorial_trial.catalog_version_before;
     } catch (error) {
       await failCatalog(error);
     }
@@ -213,18 +215,23 @@ async function requestPublic(url, { method, accept, provider }) {
   throw new Error(`${provider} redirect_invalid`);
 }
 
+const queries = queriesFromContent();
+const activisionAdapter = report.rights.effective_copyrighted_editorial_permission ? createActivisionGamesBlogAdapter({
+  registry: rightsConfig.official_source_registry,
+  fetchArticle: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "Activision Games Blog" }),
+  inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "Activision Games Blog" })
+}) : null;
+const activisionActivated = activisionAdapter?.isEligibleForCoverage(queries) === true;
+report.editorial_trial.activision_games_blog_activated = activisionActivated;
+
 const providers = [
   { name: "Openverse", search: (query) => searchOpenverse(query, limits, (url, _limits, provider) => request(url, provider)) },
   { name: "Wikimedia", search: (query) => searchWikimedia(query, limits, (url, _limits, provider) => request(url, provider)) },
-  ...(report.rights.effective_copyrighted_editorial_permission ? [createActivisionGamesBlogAdapter({
-    registry: rightsConfig.official_source_registry,
-    fetchArticle: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "Activision Games Blog" }),
-    inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "Activision Games Blog" })
-  })] : [])
+  ...(activisionActivated ? [activisionAdapter] : [])
 ];
 
 const eligible = [];
-for (const query of queriesFromContent()) {
+for (const query of queries) {
   if (Date.now() - startedAt > limits.globalTimeoutMs) { report.errors.push("Global timeout reached; remaining providers skipped."); break; }
   for (const provider of providers) {
     const stats = report.providers[provider.name] ??= { candidates: 0, accepted: 0, rejected: 0, errors: [] };
@@ -270,6 +277,14 @@ for (const query of queriesFromContent()) {
         eligible.push({ provider: provider.name, stats, query, candidate, scored, classification: scored.classification, editorialForm: scored.editorialForm, visualUtility: scored.visualUtility, rights, metadata, destination, totalScore: scored.score });
       }
     } catch (error) { stats.errors.push(error.message); report.errors.push(`${provider.name}: ${error.message}`); }
+    if (provider === activisionAdapter) {
+      const metrics = activisionAdapter.metrics();
+      Object.assign(report.editorial_trial, {
+        activision_games_blog_article_requests: metrics.article_requests,
+        activision_games_blog_media_preflights: metrics.media_preflights,
+        activision_games_blog_source_failures: metrics.source_failures
+      });
+    }
   }
 }
 
@@ -358,6 +373,7 @@ if (!dryRun && catalogSession) {
     report.catalog.update_status = "successful";
     report.catalog.drive_file_id = persisted.fileId;
     report.catalog.schema_version = persisted.catalog.schema_version;
+    report.editorial_trial.catalog_version_after = persisted.catalog.catalog_version;
   } catch (error) {
     report.catalog.update_status = "failed";
     report.catalog.update_error = error.code ?? error.message;
@@ -366,6 +382,7 @@ if (!dryRun && catalogSession) {
     report.errors.push(`Drive catalog update: ${report.catalog.update_error}`);
   }
 }
+if (!report.catalog.update_attempted) report.editorial_trial.catalog_version_after = report.editorial_trial.catalog_version_before;
 report.catalog.final_persistent_asset_count = manifest.assets.length;
 report.finished_at = new Date().toISOString();
 mkdirSync(resolve(reportPath, ".."), { recursive: true });
