@@ -71,6 +71,10 @@ The registry relationship is explicit: `blog.activision.com` is the provenance p
 
 The adapter supplies descriptive evidence to the existing generic classifier and selection pipeline: gameplay references support `gameplay`/`screenshot`, controller references support `specific`/`product`, and only reviewed promotional evidence can support cover or official art. It cannot create an Activision company-logo candidate; that remains a coverage gap. It does not imply permission to reuse Activision material: provenance and attribution are documentation only, and the controlled-risk switches remain mandatory.
 
+For one controlled production trial, the manual workflow offers `enable_copyrighted_editorial_trial`. It defaults to `false` and, when explicitly set to `true`, creates a temporary `$RUNNER_TEMP` copy of the repository configuration with only `rights.copyrighted_editorial_enabled` enabled. The repository configuration remains `false`; the temporary file is removed after the manager step and is never an artifact, report, catalog, or Drive input. The existing `allow_copyrighted_editorial` input must also be `true`: either input alone leaves the adapter disabled.
+
+The report's `editorial_trial` section records whether the adapter was actually registered for applicable coverage, its attempted article requests, media preflights, source failures, and canonical catalog version before/after the run. These are metadata-only counters; no source-media bytes or temporary configuration content enter artifacts.
+
 ## Google Drive authentication
 
 The recommended $0 production design is Google Cloud Workload Identity Federation for GitHub Actions OIDC. It avoids a long-lived JSON key in the repository. Configure a restricted Google service account with access only to the existing Drive library, then create GitHub configuration for the workload identity provider and service-account email. Do not store their values in Git.
