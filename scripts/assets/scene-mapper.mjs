@@ -79,11 +79,13 @@ function scoreAssignment(scene, asset, reuseCount) {
   const relevance = Math.min(semanticScore(asset), 60);
   const existingScore = Math.min(Math.max(Number(asset.total_score ?? 0), 0) / 5, 35);
   const reusePenalty = reuseCount * 35;
-  const score = stageScore + roleScore + relevance + qualityScore(asset) + existingScore - reusePenalty;
+  const intentRoleBonus = targetMatches(scene, asset) && asset.asset_role === scene.visual_intent && asset.semantic_relevance?.passed !== false ? 12 : 0;
+  const score = stageScore + roleScore + relevance + qualityScore(asset) + existingScore + intentRoleBonus - reusePenalty;
   const reasons = [stage];
   if (targetMatches(scene, asset)) reasons.push("target_entity_match");
   if (preferredIndex >= 0) reasons.push(`preferred_role:${preferredIndex + 1}`);
   if (semanticScore(asset)) reasons.push(`semantic_relevance:${semanticScore(asset)}`);
+  if (intentRoleBonus) reasons.push(`visual_intent_role_match:${intentRoleBonus}`);
   if (reuseCount) reasons.push(`reuse_penalty:${reusePenalty}`);
   return { score, stage, reasons, reuseCount };
 }
