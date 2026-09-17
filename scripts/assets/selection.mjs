@@ -9,7 +9,20 @@ export function selectByScoreAndDiversity(eligible, { maxDownloads, maxSimilar =
     }
     classified.push(item);
   }
-  const sorted = classified.sort((left, right) => right.totalScore - left.totalScore);
+  const comparison = (left, right) => {
+    const leftExactForm = Number(Boolean(left.query?.preferred_editorial_form) && left.editorialForm === left.query.preferred_editorial_form && (!left.query.target_entity || left.classification?.entity === left.query.target_entity));
+    const rightExactForm = Number(Boolean(right.query?.preferred_editorial_form) && right.editorialForm === right.query.preferred_editorial_form && (!right.query.target_entity || right.classification?.entity === right.query.target_entity));
+    const comparisons = [
+      rightExactForm - leftExactForm,
+      (right.scored?.semantic?.score ?? 0) - (left.scored?.semantic?.score ?? 0),
+      (right.visualUtility?.score ?? 0) - (left.visualUtility?.score ?? 0),
+      (right.rights?.provenanceConfidence ?? 0) - (left.rights?.provenanceConfidence ?? 0),
+      (right.rights?.rightsClass === "open_license" ? 1 : 0) - (left.rights?.rightsClass === "open_license" ? 1 : 0),
+      right.totalScore - left.totalScore
+    ];
+    return comparisons.find((value) => value !== 0) ?? String(left.candidate?.id ?? left.candidate?.sourceUrl ?? left.candidate?.title ?? "").localeCompare(String(right.candidate?.id ?? right.candidate?.sourceUrl ?? right.candidate?.title ?? ""));
+  };
+  const sorted = [...classified].sort(comparison);
   for (const item of sorted) {
     if (selected.length >= maxDownloads) break;
     const similar = selected.filter((chosen) =>

@@ -1,6 +1,6 @@
 import { mkdirSync, promises as fs } from "node:fs";
 import { basename, resolve } from "node:path";
-import { assetRecord, findDuplicate, inspectMetadata, loadManifest, saveManifest, scoreCandidate } from "./catalog.mjs";
+import { assetRecord, attributionLines, classifyRights, coverageGaps, deriveCoverageRequirements, findDuplicate, inspectMetadata, loadManifest, planEditorialQueries, saveManifest, scoreCandidate } from "./catalog.mjs";
 import { driveAuthenticatedIdentity, driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
 import { hydrateDriveCatalog, persistDriveCatalog, persistBootstrapOnly, prepareBootstrapOnly } from "./drive-catalog.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
@@ -15,14 +15,16 @@ const manifestPath = resolve(args.manifest ?? "asset-manager/manifest.json");
 const reportPath = resolve(args.report ?? "asset-manager/reports/latest.json");
 const dryRun = String(args["dry-run"] ?? "true") !== "false";
 const bootstrapOnly = String(args["bootstrap-only"] ?? "false") === "true";
+const allowCopyrightedEditorial = String(args["allow-copyrighted-editorial"] ?? "false") === "true";
 const expectedBootstrapAssets = args["expected-bootstrap-assets"] === undefined || args["expected-bootstrap-assets"] === "" ? null : Number(args["expected-bootstrap-assets"]);
 const config = JSON.parse(await fs.readFile(configPath, "utf8"));
+const rightsConfig = config.rights ?? { copyrighted_editorial_enabled: false, official_source_registry: [] };
 const content = JSON.parse(await fs.readFile(contentPath, "utf8"));
 const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downloads"] ?? config.limits.maxDownloads), config.limits.maxDownloads), maxQueries: Math.min(Number(args["max-queries"] ?? config.limits.maxQueries), config.limits.maxQueries) };
 let manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
 const drive = driveConfiguration();
-const report = { manager: "PlayEconomy Asset Manager V3.6.1", dry_run: dryRun, topic: content.id, limits, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, bootstrap: { bootstrap_only: bootstrapOnly, expected_assets: expectedBootstrapAssets, imported: 0, skipped: 0, conflicts: 0, conflict_details: [], catalog_previously_existed: false, catalog_created: false, catalog_drive_file_id: null, readback_validation: "not_requested", persistent_asset_count: 0, discovery_executed: false, downloads_executed: false, uploads_executed: false }, errors: [], fallback: "editorial_v2" };
+const report = { manager: "PlayEconomy Asset Manager V3.7.1", dry_run: dryRun, topic: content.id, limits, rights: { copyrighted_editorial_enabled: rightsConfig.copyrighted_editorial_enabled === true, allow_copyrighted_editorial: allowCopyrightedEditorial, effective_copyrighted_editorial_permission: rightsConfig.copyrighted_editorial_enabled === true && allowCopyrightedEditorial }, coverage: { requirements: [], planned_queries: [], gaps: [] }, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, bootstrap: { bootstrap_only: bootstrapOnly, expected_assets: expectedBootstrapAssets, imported: 0, skipped: 0, conflicts: 0, conflict_details: [], catalog_previously_existed: false, catalog_created: false, catalog_drive_file_id: null, readback_validation: "not_requested", persistent_asset_count: 0, discovery_executed: false, downloads_executed: false, uploads_executed: false }, errors: [], fallback: "editorial_v2" };
 let driveReady = false;
 let catalogSession = null;
 
@@ -148,9 +150,10 @@ if (!bootstrapOnly) {
 report.library.reusable_assets_found = manifest.assets.filter((asset) => asset.reusable && ["approved", "uploaded"].includes(asset.status)).length;
 
 function queriesFromContent() {
-  const supplied = content.visual_queries ?? [];
-  const derived = supplied.length ? supplied : (content.asset_requirements ?? []).flatMap((item) => item.queries ?? []);
-  return derived.slice(0, limits.maxQueries).map((entry) => typeof entry === "string" ? { text: entry, intent: "contextual_broll", target_category: "Tecnología", primary: entry } : { ...entry, text: entry.query ?? entry.text, intent: entry.intent ?? entry.kind ?? "contextual_broll", target_entity: entry.target_entity ?? entry.franchise ?? entry.company ?? null, target_category: entry.target_category ?? entry.category ?? "Tecnología" });
+  const planned = planEditorialQueries(content, { maxQueries: limits.maxQueries });
+  report.coverage.requirements = deriveCoverageRequirements(content);
+  report.coverage.planned_queries = planned.map((query) => ({ entity: query.entity, asset_role: query.asset_role, preferred_editorial_form: query.preferred_editorial_form, query: query.text }));
+  return planned.map((entry) => ({ ...entry, primary: entry.text, target_category: entry.target_category ?? "Tecnología" }));
 }
 
 async function request(url, provider) {
@@ -189,15 +192,20 @@ for (const query of queriesFromContent()) {
       stats.candidates += candidates.length;
       for (const candidate of candidates) {
         candidate.topic = content.id;
-        const scored = scoreCandidate(candidate, query);
-        const metadata = inspectMetadata(candidate);
+        const rights = classifyRights(candidate, {
+          copyrightedEditorialEnabled: rightsConfig.copyrighted_editorial_enabled === true,
+          allowCopyrightedEditorial,
+          officialSourceRegistry: rightsConfig.official_source_registry ?? []
+        });
+        const scored = scoreCandidate(candidate, query, { rights });
+        const metadata = inspectMetadata(candidate, { rights });
         const duplicate = findDuplicate(manifest, candidate);
         const destination = resolveAssetDestination(scored.classification.role, { entity: scored.classification.entity });
         const rejectionReasons = [];
         if (duplicate) rejectionReasons.push("duplicate");
         if (!candidate.sourceUrl || !candidate.downloadUrl) rejectionReasons.push("invalid_url");
         if (metadata.missingFields.length) rejectionReasons.push("missing_metadata");
-        if (!scored.license.allowed) rejectionReasons.push(scored.license.reason === "license-not-reusable" ? "license_unknown" : "license_not_allowed");
+        if (!rights.accepted) rejectionReasons.push(rights.reason);
         if (scored.quality.tier === "low_resolution" || scored.quality.tier === "reject") rejectionReasons.push("insufficient_resolution");
         if (!String(candidate.mimeType ?? "").startsWith("image/")) rejectionReasons.push("unsupported_mime");
         if (!scored.semantic.passed) rejectionReasons.push("low_semantic_relevance");
@@ -206,33 +214,37 @@ for (const query of queriesFromContent()) {
           stats.rejected += 1;
           if (duplicate) report.duplicates += 1;
           rejectionReasons.forEach((reason) => report.rejection_summary[reason] = (report.rejection_summary[reason] ?? 0) + 1);
-          report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, role: scored.classification.role, target_entity: query.target_entity ?? null, resolved_destination: destination, semantic_relevance: scored.semantic, rejection_reasons: [...new Set(rejectionReasons)], missing_fields: metadata.missingFields, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, license_url: candidate.licenseUrl, width: candidate.width, height: candidate.height } });
+          report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, role: scored.classification.role, editorial_form: scored.editorialForm, target_entity: query.target_entity ?? null, resolved_destination: destination, rights, semantic_relevance: scored.semantic, rejection_reasons: [...new Set(rejectionReasons)], missing_fields: metadata.missingFields, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, visual_utility: scored.visualUtility, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, license_url: candidate.licenseUrl, width: candidate.width, height: candidate.height } });
           continue;
         }
         candidate.assetRole = scored.classification.role;
+        candidate.rights_class = rights.rightsClass;
+        candidate.editorial_form = scored.editorialForm;
+        candidate.visual_utility = scored.visualUtility.score;
         candidate.category = destination.finalCategory;
         candidate.franchise = ["specific", "cover_art", "gameplay", "character", "official_art", "map"].includes(scored.classification.role) ? destination.finalEntity : null;
         candidate.company = scored.classification.role === "company" ? destination.finalEntity : null;
         candidate.console = scored.classification.role === "console" ? destination.finalEntity : null;
         candidate.finalEntity = destination.finalEntity;
-        eligible.push({ provider: provider.name, stats, query, candidate, scored, classification: scored.classification, metadata, destination, totalScore: scored.score });
+        eligible.push({ provider: provider.name, stats, query, candidate, scored, classification: scored.classification, editorialForm: scored.editorialForm, visualUtility: scored.visualUtility, rights, metadata, destination, totalScore: scored.score });
       }
     } catch (error) { stats.errors.push(error.message); report.errors.push(`${provider.name}: ${error.message}`); }
   }
 }
 
 const selection = selectByScoreAndDiversity(eligible, limits);
+report.coverage.gaps = coverageGaps(report.coverage.requirements, selection.selected, eligible);
 for (const rejected of selection.rejected) {
   rejected.stats.rejected += 1;
   report.rejection_summary.diversity_limit = (report.rejection_summary.diversity_limit ?? 0) + 1;
-  report.rejected_candidates.push({ provider: rejected.provider, query: rejected.query.text, query_intent: rejected.query.intent, role: rejected.classification?.role ?? null, target_entity: rejected.query.target_entity ?? null, resolved_destination: rejected.destination ?? null, semantic_relevance: rejected.scored?.semantic ?? null, rejection_reasons: ["diversity_limit"], missing_fields: [], metadata_warnings: rejected.metadata.warnings, quality_tier: rejected.scored.quality.tier, score_breakdown: rejected.scored.scoreBreakdown, total_score: rejected.totalScore, asset: { title: rejected.candidate.title, source_url: rejected.candidate.sourceUrl, license: rejected.candidate.license } });
+  report.rejected_candidates.push({ provider: rejected.provider, query: rejected.query.text, query_intent: rejected.query.intent, role: rejected.classification?.role ?? null, editorial_form: rejected.editorialForm ?? null, target_entity: rejected.query.target_entity ?? null, resolved_destination: rejected.destination ?? null, rights: rejected.rights ?? null, semantic_relevance: rejected.scored?.semantic ?? null, rejection_reasons: ["diversity_limit"], missing_fields: [], metadata_warnings: rejected.metadata.warnings, quality_tier: rejected.scored.quality.tier, visual_utility: rejected.scored.visualUtility ?? null, score_breakdown: rejected.scored.scoreBreakdown, total_score: rejected.totalScore, asset: { title: rejected.candidate.title, source_url: rejected.candidate.sourceUrl, license: rejected.candidate.license } });
 }
 
 const executionChecksums = new Set();
 for (const selected of selection.selected) {
   const { candidate, destination, scored, metadata, query, stats } = selected;
-  const record = assetRecord(candidate, { reusable: false, status: "candidate", drivePath: destination.drivePath, query: query.text, queryIntent: query.intent, semanticRelevance: scored.semantic, qualityTier: scored.quality.tier, totalScore: scored.score });
-  const proposal = { query: query.text, query_intent: query.intent, asset_role: scored.classification.role, classification_confidence: scored.classification.confidence, target_entity: query.target_entity ?? null, final_category: destination.finalCategory, final_entity: destination.finalEntity, drive_path: destination.drivePath, semantic_relevance: scored.semantic, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, download_status: "not_requested", download_error: null, upload_status: "not_requested", upload_error: null, checksum: null, local_cache_path: null, bytes: 0, asset: record };
+  const record = assetRecord(candidate, { reusable: false, status: "candidate", drivePath: destination.drivePath, query: query.text, queryIntent: query.intent, semanticRelevance: scored.semantic, qualityTier: scored.quality.tier, totalScore: scored.score, rightsClass: selected.rights.rightsClass, editorialForm: scored.editorialForm, visualUtility: scored.visualUtility.score });
+  const proposal = { query: query.text, query_intent: query.intent, asset_role: scored.classification.role, editorial_form: scored.editorialForm, visual_utility: scored.visualUtility, rights: selected.rights, attribution: attributionLines(record), classification_confidence: scored.classification.confidence, target_entity: query.target_entity ?? null, final_category: destination.finalCategory, final_entity: destination.finalEntity, drive_path: destination.drivePath, semantic_relevance: scored.semantic, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, score_breakdown: scored.scoreBreakdown, total_score: scored.score, reasons: scored.reasons, download_status: "not_requested", download_error: null, upload_status: "not_requested", upload_error: null, checksum: null, local_cache_path: null, bytes: 0, asset: record };
   if (shouldDownload(dryRun) && Date.now() - startedAt > limits.globalTimeoutMs) {
     proposal.download_status = "error";
     proposal.download_error = "global_timeout";

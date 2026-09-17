@@ -38,18 +38,84 @@ export function allowedLicense(candidate) {
 
 export const CRITICAL_METADATA = ["source", "source_url", "title", "license"];
 export const OPTIONAL_METADATA = ["creator", "license_url", "attribution"];
+export const RIGHTS_CLASSES = Object.freeze({
+  OPEN_LICENSE: "open_license",
+  COPYRIGHTED_EDITORIAL: "copyrighted_editorial",
+  REJECTED_OR_UNKNOWN: "rejected_or_unknown"
+});
+export const EDITORIAL_FORMS = Object.freeze(["screenshot", "lifestyle", "clean_art", "physical_case", "product", "logo", "contextual"]);
 
-export function inspectMetadata(candidate) {
+const COPYRIGHTED_EDITORIAL_FIELDS = [
+  "copyright_owner", "source_type", "source_url", "provenance_page_url", "source_domain",
+  "retrieved_at", "attribution", "provenance_status", "official_source_registry_id"
+];
+
+export function inspectMetadata(candidate, { rights = null } = {}) {
   const missingFields = [];
   if (!candidate.provider) missingFields.push("source");
   if (!candidate.sourceUrl) missingFields.push("source_url");
   if (!candidate.title) missingFields.push("title");
-  if (!candidate.license || /unknown/i.test(candidate.license)) missingFields.push("license");
+  if (rights?.rightsClass === RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL) {
+    for (const field of COPYRIGHTED_EDITORIAL_FIELDS) {
+      const key = field.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      if (!candidate[field] && !candidate[key]) missingFields.push(field);
+    }
+  } else if (!candidate.license || /unknown/i.test(candidate.license)) missingFields.push("license");
   const warnings = [];
   if (!candidate.creator) warnings.push("creator_missing");
   if (!candidate.licenseUrl && !/public domain|pdm/i.test(candidate.license ?? "")) warnings.push("license_url_missing");
   if (!candidate.attribution && candidate.creator) warnings.push("attribution_missing");
   return { missingFields, warnings };
+}
+
+function configuredRegistryEntry(candidate, registry = []) {
+  const id = candidate.official_source_registry_id ?? candidate.officialSourceRegistryId;
+  const entry = (registry ?? []).find((item) => item?.id === id && item.approved === true);
+  if (!entry) return null;
+  const provenanceUrl = candidate.provenance_page_url ?? candidate.provenancePageUrl;
+  const sourceUrl = candidate.sourceUrl ?? candidate.source_url;
+  let provenanceDomain;
+  let sourceDomain;
+  try {
+    provenanceDomain = new URL(provenanceUrl).hostname.toLowerCase();
+    sourceDomain = new URL(sourceUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const allowedPages = entry.domains ?? [];
+  const allowedAssets = [...allowedPages, ...(entry.cdn_domains ?? [])];
+  const sourceType = candidate.source_type ?? candidate.sourceType;
+  if (!allowedPages.includes(provenanceDomain) || !allowedAssets.includes(sourceDomain) || !(entry.source_types ?? []).includes(sourceType)) return null;
+  return entry;
+}
+
+export function classifyRights(candidate, { copyrightedEditorialEnabled = false, allowCopyrightedEditorial = false, officialSourceRegistry = [] } = {}) {
+  const requested = candidate.rights_class ?? candidate.rightsClass ?? null;
+  if (requested === RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL) {
+    const provenancePageUrl = candidate.provenance_page_url ?? candidate.provenancePageUrl;
+    const sourceDomain = candidate.source_domain ?? candidate.sourceDomain;
+    const metadataComplete = COPYRIGHTED_EDITORIAL_FIELDS.every((field) => {
+      const key = field.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      return Boolean(candidate[field] ?? candidate[key]);
+    });
+    const registryEntry = configuredRegistryEntry(candidate, officialSourceRegistry);
+    const sourceHostMatches = (() => {
+      try { return new URL(candidate.sourceUrl ?? candidate.source_url).hostname.toLowerCase() === String(sourceDomain ?? "").toLowerCase(); } catch { return false; }
+    })();
+    const validEditorial = metadataComplete && candidate.editorial_use_only === true && candidate.license == null &&
+      candidate.license_status === "no_open_license_identified" && candidate.provenance_status === "verified_first_party" &&
+      Boolean(provenancePageUrl) && sourceHostMatches && Boolean(registryEntry);
+    if (!validEditorial) return { accepted: false, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: "copyrighted_editorial_provenance_invalid", provenanceConfidence: 0 };
+    if (!copyrightedEditorialEnabled || !allowCopyrightedEditorial) return { accepted: false, rightsClass: RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL, reason: "copyrighted_editorial_disabled", provenanceConfidence: 100 };
+    return { accepted: true, rightsClass: RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL, reason: "verified_first_party_editorial", provenanceConfidence: 100, registryId: registryEntry.id };
+  }
+  const license = allowedLicense(candidate);
+  if (requested === RIGHTS_CLASSES.OPEN_LICENSE || !requested) {
+    return license.allowed
+      ? { accepted: true, rightsClass: RIGHTS_CLASSES.OPEN_LICENSE, reason: "reusable_license", provenanceConfidence: 80 }
+      : { accepted: false, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: license.reason, provenanceConfidence: 0 };
+  }
+  return { accepted: false, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: "rights_class_rejected_or_unknown", provenanceConfidence: 0 };
 }
 
 export function qualityTier(candidate) {
@@ -88,6 +154,151 @@ function visualEvidence(text) {
     official: /\b(?:official|promotional|promotion|promo|press kit|key art)\b/.test(text),
     gameplay: /\b(?:gameplay|screenshot|screen shot|in game|in game)\b/.test(text)
   };
+}
+
+export function classifyEditorialForm(candidate, query, classification = classifyAsset(candidate, query)) {
+  const { title, metadata } = candidateText(candidate);
+  const text = `${title} ${metadata}`.trim();
+  const physicalCase = /\b(?:collection|cases?|game cases?|boxed|shelf|shelves|multiple boxes?)\b/.test(text);
+  const lifestyle = /\b(?:people|person|players?|playing|hands? on|event|audience|crowd)\b/.test(text);
+  if (physicalCase) return "physical_case";
+  if (lifestyle) return "lifestyle";
+  if (/\blogo(?:type|mark)?\b/.test(text)) return "logo";
+  if (/\b(?:controller|peripheral|accessor(?:y|ies)|guitar controller|hardware)\b/.test(text)) return "product";
+  if (classification.role === "cover_art" || /\b(?:cover art|box art|key art|game cover|sleeve)\b/.test(text)) return "clean_art";
+  if (classification.role === "gameplay" && /\b(?:gameplay|screenshot|screen shot|in game)\b/.test(text)) return "screenshot";
+  if (classification.role === "contextual_broll" || /\b(?:concert|music|stage|electric guitar)\b/.test(text)) return "contextual";
+  return null;
+}
+
+function preferredForm(query) {
+  return query.preferred_editorial_form ?? query.preferredEditorialForm ?? null;
+}
+
+export function visualUtility(candidate, query, { classification = classifyAsset(candidate, query), editorialForm = classifyEditorialForm(candidate, query, classification), quality = qualityTier(candidate) } = {}) {
+  const preferred = preferredForm(query);
+  const reasons = [];
+  let score = 0;
+  if (preferred && editorialForm === preferred) { score += 60; reasons.push("preferred_editorial_form"); }
+  else if (preferred && editorialForm) { score -= 35; reasons.push("editorial_form_mismatch"); }
+  else if (editorialForm) { score += 12; reasons.push("identified_editorial_form"); }
+  if (quality.tier === "high_quality") { score += 12; reasons.push("high_quality"); }
+  else if (quality.tier === "usable") { score += 4; reasons.push("usable_quality"); }
+  const ratio = Number(candidate.width ?? 0) / Number(candidate.height ?? 1);
+  if (editorialForm === "screenshot" && ratio >= 1.2) { score += 8; reasons.push("screenshot_landscape"); }
+  if (["clean_art", "product", "logo"].includes(editorialForm) && ratio >= 0.75 && ratio <= 1.5) { score += 8; reasons.push("contain_friendly_ratio"); }
+  if (editorialForm === "lifestyle" && preferred === "screenshot") { score -= 20; reasons.push("lifestyle_not_screenshot"); }
+  if (editorialForm === "physical_case" && preferred === "clean_art") { score -= 20; reasons.push("physical_case_not_clean_art"); }
+  return { score, editorial_form: editorialForm, preferred_editorial_form: preferred, reasons };
+}
+
+function requirementKey(requirement) {
+  return [requirement.entity ?? "", requirement.asset_role, requirement.preferred_editorial_form].join("|");
+}
+
+function sceneRequirement(scene) {
+  const entity = scene.target_entity ?? null;
+  if (scene.visual_intent === "gameplay") return { entity, asset_role: "gameplay", preferred_editorial_form: "screenshot" };
+  if (scene.visual_intent === "company_context") return { entity, asset_role: "company", preferred_editorial_form: "logo" };
+  if (scene.visual_intent === "rock_music_context") return { entity: null, asset_role: "contextual_broll", preferred_editorial_form: "contextual" };
+  if (["franchise_identity", "franchise_conclusion"].includes(scene.visual_intent)) return { entity, asset_role: "cover_art", preferred_editorial_form: "clean_art" };
+  return null;
+}
+
+function queryRequirement(entry) {
+  const text = entry.query ?? entry.text ?? "";
+  const intent = entry.intent ?? entry.kind ?? "contextual_broll";
+  const entity = entry.target_entity ?? entry.franchise ?? entry.company ?? null;
+  if (intent === "gameplay") return { entity, asset_role: "gameplay", preferred_editorial_form: "screenshot" };
+  if (intent === "cover_art") return { entity, asset_role: "cover_art", preferred_editorial_form: "clean_art" };
+  if (intent === "official_art") return { entity, asset_role: "official_art", preferred_editorial_form: "clean_art" };
+  if (intent === "company") return { entity, asset_role: "company", preferred_editorial_form: "logo" };
+  if (intent === "specific" && /\b(?:controller|peripheral|accessor)/i.test(text)) return { entity, asset_role: "specific", preferred_editorial_form: "product" };
+  if (intent === "contextual_broll") return { entity: null, asset_role: "contextual_broll", preferred_editorial_form: "contextual" };
+  return null;
+}
+
+export function deriveCoverageRequirements(content) {
+  const requirements = [];
+  for (const scene of content.scenes ?? []) {
+    const requirement = sceneRequirement(scene);
+    if (requirement) requirements.push({ ...requirement, scene_id: scene.scene_id });
+  }
+  for (const query of content.visual_queries ?? []) {
+    const requirement = queryRequirement(typeof query === "string" ? { query } : query);
+    if (requirement) requirements.push(requirement);
+  }
+  const seen = new Set();
+  return requirements.filter((requirement) => {
+    const key = requirementKey(requirement);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function queryTextForRequirement(requirement) {
+  const entity = requirement.entity ? `${requirement.entity} ` : "";
+  const form = requirement.preferred_editorial_form;
+  if (requirement.asset_role === "gameplay") return `${entity}gameplay screenshot`;
+  if (requirement.asset_role === "cover_art") return `${entity}game cover art`;
+  if (requirement.asset_role === "official_art") return `${entity}official promotional artwork`;
+  if (requirement.asset_role === "company") return `${entity}logo`;
+  if (requirement.asset_role === "specific" && form === "product") return `${entity}controller product`;
+  if (requirement.asset_role === "contextual_broll") return "electric guitar concert";
+  return `${entity}${requirement.asset_role}`.trim();
+}
+
+export function planEditorialQueries(content, { maxQueries = 8 } = {}) {
+  const requirements = deriveCoverageRequirements(content);
+  const planned = requirements.map((requirement) => ({
+    text: queryTextForRequirement(requirement),
+    intent: requirement.asset_role,
+    target_entity: requirement.entity,
+    target_category: null,
+    ...requirement
+  }));
+  const seen = new Set();
+  return planned.filter((query) => {
+    const key = `${query.text.toLowerCase()}|${query.asset_role}|${query.preferred_editorial_form}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, Math.max(0, maxQueries));
+}
+
+export function coverageGaps(requirements, selected, eligible) {
+  return requirements.flatMap((requirement) => {
+    const matches = (item) => item.classification?.role === requirement.asset_role && item.editorialForm === requirement.preferred_editorial_form &&
+      (requirement.entity == null || item.classification?.entity === requirement.entity);
+    if (selected.some(matches)) return [];
+    const candidateExists = eligible.some(matches);
+    return [{
+      entity: requirement.entity,
+      asset_role: requirement.asset_role,
+      preferred_editorial_form: requirement.preferred_editorial_form,
+      attempted_queries: requirements.filter((item) => requirementKey(item) === requirementKey(requirement)).map(() => queryTextForRequirement(requirement)),
+      reason: candidateExists ? "max_downloads_limit_or_selection" : "no_accepted_candidate"
+    }];
+  });
+}
+
+export function attributionLines(asset) {
+  if (asset.rights_class === RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL) {
+    return [
+      "Rights class: Copyrighted editorial",
+      `Copyright owner: ${asset.copyright_owner}`,
+      `Official source: ${asset.provenance_page_url}`,
+      "License: No open license identified",
+      "Use classification: Editorial supporting visual only",
+      "Attribution/provenance documentation does not itself grant reuse permission."
+    ];
+  }
+  return [
+    "Rights class: Open license",
+    `License: ${asset.license ?? "Unknown"}`,
+    ...(asset.license_url ? [`License URL: ${asset.license_url}`] : [])
+  ];
 }
 
 export function classifyAsset(candidate, query) {
@@ -181,7 +392,7 @@ export function findDuplicate(manifest, candidate, checksum) {
   );
 }
 
-export function scoreCandidate(candidate, query) {
+export function scoreCandidate(candidate, query, { rights = null } = {}) {
   const text = `${candidate.title ?? ""} ${candidate.description ?? ""} ${(candidate.tags ?? []).join(" ")}`.toLowerCase();
   const terms = query.text.toLowerCase().split(/\s+/).filter((term) => term.length > 2);
   const matches = terms.filter((term) => text.includes(term)).length;
@@ -189,7 +400,10 @@ export function scoreCandidate(candidate, query) {
   const classification = classifyAsset(candidate, query);
   const semantic = semanticRelevance(candidate, query, classification);
   const quality = qualityTier(candidate);
-  const breakdown = { relevance: matches * 10, semantic_relevance: semantic.score, resolution: quality.score, license: 0, orientation: 0, specificity: 0, mime: 0 };
+  const editorialForm = classifyEditorialForm(candidate, query, classification);
+  const utility = visualUtility(candidate, query, { classification, editorialForm, quality });
+  const resolvedRights = rights ?? classifyRights(candidate);
+  const breakdown = { relevance: matches * 10, semantic_relevance: semantic.score, visual_utility: utility.score, resolution: quality.score, license: 0, orientation: 0, specificity: 0, mime: 0 };
   const reasons = [`relevance:${matches}/${terms.length}`, quality.reason];
   if (["image/jpeg", "image/png", "image/webp"].includes(candidate.mimeType)) { breakdown.mime = 8; reasons.push("supported-image"); }
   else { breakdown.mime = -20; reasons.push("unsupported_mime"); }
@@ -198,14 +412,14 @@ export function scoreCandidate(candidate, query) {
     if (ratio >= 0.85) { breakdown.orientation = 10; reasons.push("vertical-friendly"); }
     else { breakdown.orientation = 4; reasons.push("crop-pan-eligible"); }
   }
-  breakdown.license = license.allowed ? 25 : -60;
-  if (license.allowed) reasons.push(license.reason); else reasons.push(license.reason === "license-not-reusable" ? "license_unknown" : "license_not_allowed");
+  breakdown.license = resolvedRights.rightsClass === RIGHTS_CLASSES.OPEN_LICENSE ? 25 : resolvedRights.rightsClass === RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL && resolvedRights.accepted ? 0 : -60;
+  reasons.push(resolvedRights.reason);
   if (classification.role === "cover_art") { breakdown.specificity = 35; reasons.push("cover-art-match"); }
   else if (classification.role === "official_art") { breakdown.specificity = 30; reasons.push("official-art-match"); }
   else if (query.intent === "specific" && classification.role === "specific") { breakdown.specificity = 15; reasons.push("specific-match"); }
   if (query.intent === "gameplay" && classification.role !== "gameplay") { breakdown.specificity = -18; reasons.push("gameplay_evidence_missing"); }
   reasons.push(...semantic.reasons);
-  return { score: Object.values(breakdown).reduce((total, value) => total + value, 0), scoreBreakdown: breakdown, reasons, license, quality, classification, semantic };
+  return { score: Object.values(breakdown).reduce((total, value) => total + value, 0), scoreBreakdown: breakdown, reasons, license, rights: resolvedRights, quality, classification, editorialForm, visualUtility: utility, semantic };
 }
 
 export function sha256(buffer) {
@@ -239,6 +453,18 @@ export function assetRecord(candidate, overrides = {}) {
     license: candidate.license ?? null,
     license_url: candidate.licenseUrl ?? null,
     attribution: candidate.attribution ?? null,
+    rights_class: overrides.rightsClass ?? candidate.rights_class ?? null,
+    copyright_owner: candidate.copyright_owner ?? null,
+    source_type: candidate.source_type ?? null,
+    provenance_page_url: candidate.provenance_page_url ?? null,
+    source_domain: candidate.source_domain ?? null,
+    retrieved_at: candidate.retrieved_at ?? null,
+    editorial_use_only: candidate.editorial_use_only ?? false,
+    license_status: candidate.license_status ?? null,
+    provenance_status: candidate.provenance_status ?? null,
+    official_source_registry_id: candidate.official_source_registry_id ?? null,
+    editorial_form: overrides.editorialForm ?? candidate.editorial_form ?? null,
+    visual_utility: overrides.visualUtility ?? candidate.visual_utility ?? null,
     download_date: overrides.downloadDate ?? null,
     width: candidate.width ?? null,
     height: candidate.height ?? null,

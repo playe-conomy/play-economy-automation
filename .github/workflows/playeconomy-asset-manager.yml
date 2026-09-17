@@ -16,6 +16,11 @@ on:
         description: Maximum proposed downloads when dry run is disabled
         required: true
         default: "5"
+      allow_copyrighted_editorial:
+        description: Permit only registry-verified copyrighted editorial candidates when globally enabled
+        required: true
+        type: boolean
+        default: false
       bootstrap_manifest:
         description: Optional repository-local V3.4 manifest used only to initialize a missing Drive catalog
         required: false
@@ -107,6 +112,7 @@ jobs:
             --content "${{ inputs.content_file }}" \
             --dry-run "${{ inputs.dry_run }}" \
             --max-downloads "${{ inputs.max_downloads }}" \
+            --allow-copyrighted-editorial "${{ inputs.allow_copyrighted_editorial }}" \
             --bootstrap-only "${{ inputs.bootstrap_only }}" \
             --expected-bootstrap-assets "${{ inputs.expected_bootstrap_assets }}" \
             "${bootstrap_args[@]}" \
@@ -129,7 +135,6 @@ jobs:
           path: |
             asset-manager/reports/latest.json
             asset-manager/manifest.json
-            .cache/assets/
           if-no-files-found: error
           retention-days: 7
 

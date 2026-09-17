@@ -53,6 +53,16 @@ The report exposes download counts and per-asset status, structured error, check
 
 The workflow first runs with `dry_run=true`. It may perform small metadata searches, but it downloads no assets, writes no Drive files and does not alter the manifest. When no acceptable candidate exists, its report declares `fallback: editorial_v2`.
 
+## V3.7.1 editorial quality and rights
+
+The existing reusable path remains unchanged: `open_license` accepts only the existing CC0, Public Domain/PDM, CC BY and CC BY-SA allowlist. `rejected_or_unknown` material never enters the catalog. The future controlled-risk class, `copyrighted_editorial`, is disabled by default and is not populated by the Openverse or Wikimedia adapters.
+
+Copyrighted editorial candidates require a registry-approved first-party source, owner, source and provenance URLs/domains, retrieval timestamp, attribution, `editorial_use_only: true`, `license: null`, `license_status: no_open_license_identified`, and `provenance_status: verified_first_party`. Provenance documentation does not grant reuse permission. Both `rights.copyrighted_editorial_enabled` in `asset-manager/config.json` and the `allow_copyrighted_editorial` workflow input must be true before such a candidate can be considered.
+
+Candidates may carry an optional `editorial_form`: `screenshot`, `lifestyle`, `clean_art`, `physical_case`, `product`, `logo`, or `contextual`. Deterministic `visual_utility` ranks an exact requested form above weaker editorial forms after rights, media and semantic gates. Scene intent produces ephemeral coverage requirements and up to eight deliberate queries; unmet requirements are reported as `coverage_gap` rather than weakening gates.
+
+The Asset Manager review artifact contains reports and the manifest only. It intentionally excludes `.cache/assets/` source media. V4 already excludes its fetched source media from review artifacts. V3.7.2 may add reviewed registry-backed official-source adapters; V3.7.1 adds no provider or web ingestion.
+
 ## Google Drive authentication
 
 The recommended $0 production design is Google Cloud Workload Identity Federation for GitHub Actions OIDC. It avoids a long-lived JSON key in the repository. Configure a restricted Google service account with access only to the existing Drive library, then create GitHub configuration for the workload identity provider and service-account email. Do not store their values in Git.
