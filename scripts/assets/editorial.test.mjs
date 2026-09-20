@@ -28,6 +28,8 @@ const concert = { ...openScreenshot, title: "Electric guitar concert", descripti
 
 assert.equal(config.rights.copyrighted_editorial_enabled, false, "global controlled-risk switch defaults to false");
 assert.equal(config.rights.official_source_registry[0]?.id, "activision-games-blog-guitar-hero-live", "the reviewed V3.7.2 registry source is configured while the global switch remains disabled");
+assert.equal(config.rights.official_source_registry[0]?.approved_static_assets?.length, 3, "the controlled static registry contains only the three reviewed Guitar Hero assets");
+assert.ok(config.rights.official_source_registry[0]?.cdn_domains?.includes("blog.activision.com"), "first-party static media remains an explicit registry host rather than a broad discovery permission");
 assert.equal(classifyRights(openScreenshot).rightsClass, RIGHTS_CLASSES.OPEN_LICENSE);
 assert.equal(classifyRights({ ...openScreenshot, license: "Unknown" }).rightsClass, RIGHTS_CLASSES.REJECTED_OR_UNKNOWN);
 

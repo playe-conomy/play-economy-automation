@@ -21,8 +21,40 @@
         "id": "activision-games-blog-guitar-hero-live",
         "approved": true,
         "domains": ["blog.activision.com"],
-        "cdn_domains": ["community.activision.com"],
-        "source_types": ["activision_games_blog_article"]
+        "cdn_domains": ["community.activision.com", "blog.activision.com"],
+        "source_types": ["activision_games_blog_article"],
+        "approved_static_assets": [
+          {
+            "page_url": "https://blog.activision.com/guitar-hero/archives/guitar-hero-live-introducing-hero-powers",
+            "asset_url": "https://blog.activision.com/content/dam/atvi/activision/atvi-touchui/blog/archives/feature/guitar-hero/featured-Image9913431.jpg",
+            "role": "gameplay",
+            "editorial_form": "screenshot",
+            "target_entity": "Guitar Hero",
+            "width": 1500,
+            "height": 500,
+            "mime_type": "image/jpeg"
+          },
+          {
+            "page_url": "https://blog.activision.com/guitar-hero/archives/guitar-hero-live-test-your-skills-in-rivals-arena",
+            "asset_url": "https://blog.activision.com/content/dam/atvi/activision/atvi-touchui/blog/archives/feature/guitar-hero/featured-Image9894231.jpg",
+            "role": "gameplay",
+            "editorial_form": "screenshot",
+            "target_entity": "Guitar Hero",
+            "width": 1920,
+            "height": 762,
+            "mime_type": "image/jpeg"
+          },
+          {
+            "page_url": "https://blog.activision.com/es/guitar-hero/archives/the-guitar-hero-live-controller-six-things-you-need-to-know",
+            "asset_url": "https://blog.activision.com/content/dam/atvi/activision/atvi-touchui/blog/archives/feature/guitar-hero/featured-Image9905852.jpg",
+            "role": "specific",
+            "editorial_form": "product",
+            "target_entity": "Guitar Hero",
+            "width": 1280,
+            "height": 508,
+            "mime_type": "image/jpeg"
+          }
+        ]
       }
     ]
   },
