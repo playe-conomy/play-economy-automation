@@ -25,7 +25,7 @@ const limits = { ...config.limits, maxDownloads: Math.min(Number(args["max-downl
 let manifest = loadManifest(manifestPath);
 const startedAt = Date.now();
 const drive = driveConfiguration();
-const report = { manager: "PlayEconomy Asset Manager V3.7.1", dry_run: dryRun, topic: content.id, limits, rights: { copyrighted_editorial_enabled: rightsConfig.copyrighted_editorial_enabled === true, allow_copyrighted_editorial: allowCopyrightedEditorial, effective_copyrighted_editorial_permission: rightsConfig.copyrighted_editorial_enabled === true && allowCopyrightedEditorial }, editorial_trial: { activision_games_blog_activated: false, activision_games_blog_article_requests: 0, activision_games_blog_media_preflights: 0, activision_games_blog_source_failures: 0, catalog_version_before: null, catalog_version_after: null }, coverage: { requirements: [], planned_queries: [], gaps: [] }, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, bootstrap: { bootstrap_only: bootstrapOnly, expected_assets: expectedBootstrapAssets, imported: 0, skipped: 0, conflicts: 0, conflict_details: [], catalog_previously_existed: false, catalog_created: false, catalog_drive_file_id: null, readback_validation: "not_requested", persistent_asset_count: 0, discovery_executed: false, downloads_executed: false, uploads_executed: false }, errors: [], fallback: "editorial_v2" };
+const report = { manager: "PlayEconomy Asset Manager V3.7.1", dry_run: dryRun, topic: content.id, limits, rights: { copyrighted_editorial_enabled: rightsConfig.copyrighted_editorial_enabled === true, allow_copyrighted_editorial: allowCopyrightedEditorial, effective_copyrighted_editorial_permission: rightsConfig.copyrighted_editorial_enabled === true && allowCopyrightedEditorial }, editorial_trial: { activision_games_blog_activated: false, activision_games_blog_article_requests: 0, activision_games_blog_media_preflights: 0, activision_games_blog_source_failures: 0, activision_games_blog_source_failure_details: [], catalog_version_before: null, catalog_version_after: null }, coverage: { requirements: [], planned_queries: [], gaps: [] }, library: { reusable_assets_found: 0 }, providers: {}, rejection_summary: {}, rejected_candidates: [], duplicates: 0, proposed_downloads: [], downloads: { attempted: 0, successful: 0, failed: 0, duplicates: 0 }, drive: { ...drive, root_verification: "not_requested", attempted: 0, successful: 0, failed: 0, duplicates_skipped: 0 }, catalog: { hydration_status: "not_requested", drive_file_id: null, schema_version: null, hydrated_assets: 0, bootstrap: { status: "not_requested", imported: 0, skipped: 0 }, update_attempted: false, update_status: "not_requested", conflict_detected: false, media_may_be_uncatalogued: false, final_persistent_asset_count: 0 }, bootstrap: { bootstrap_only: bootstrapOnly, expected_assets: expectedBootstrapAssets, imported: 0, skipped: 0, conflicts: 0, conflict_details: [], catalog_previously_existed: false, catalog_created: false, catalog_drive_file_id: null, readback_validation: "not_requested", persistent_asset_count: 0, discovery_executed: false, downloads_executed: false, uploads_executed: false }, errors: [], fallback: "editorial_v2" };
 let driveReady = false;
 let catalogSession = null;
 
@@ -180,18 +180,45 @@ async function request(url, provider) {
   throw lastError;
 }
 
-async function requestPublic(url, { method, accept, provider }) {
+async function readBoundedResponse(response, maximumBytes) {
+  const reader = response.body?.getReader();
+  if (!reader) return { bytes: new Uint8Array(), bodyExceeded: false };
+  const chunks = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maximumBytes) return { bytes: new Uint8Array(), bodyExceeded: true };
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { bytes, bodyExceeded: false };
+}
+
+async function requestPublic(url, { method, accept, provider, rangeBytes = null }) {
   let current = new URL(url);
   const hops = [current.toString()];
   for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), limits.httpTimeoutMs);
     try {
+      const headers = { "User-Agent": config.userAgent, Accept: accept };
+      if (rangeBytes !== null) headers.Range = `bytes=0-${rangeBytes - 1}`;
       const response = await fetch(current, {
         method,
         redirect: "manual",
         signal: controller.signal,
-        headers: { "User-Agent": config.userAgent, Accept: accept }
+        headers
       });
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get("location");
@@ -200,13 +227,18 @@ async function requestPublic(url, { method, accept, provider }) {
         hops.push(current.toString());
         continue;
       }
-      if (!response.ok) throw new Error(`${provider} HTTP ${response.status}`);
+      if (!response.ok) throw Object.assign(new Error(`${provider} HTTP ${response.status}`), { code: "http_error", status: response.status });
+      const bounded = rangeBytes === null ? null : await readBoundedResponse(response, rangeBytes);
       return {
         ok: true,
+        status: response.status,
         url: current.toString(),
         hops,
         contentType: response.headers.get("content-type")?.split(";")[0] ?? null,
-        html: method === "GET" ? await response.text() : null
+        contentRange: response.headers.get("content-range"),
+        bodyExceeded: bounded?.bodyExceeded ?? false,
+        bytes: bounded?.bytes,
+        html: method === "GET" && rangeBytes === null ? await response.text() : null
       };
     } finally {
       clearTimeout(timer);
@@ -219,7 +251,8 @@ const queries = queriesFromContent();
 const activisionAdapter = report.rights.effective_copyrighted_editorial_permission ? createActivisionGamesBlogAdapter({
   registry: rightsConfig.official_source_registry,
   fetchArticle: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "Activision Games Blog" }),
-  inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "Activision Games Blog" })
+  inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "Activision Games Blog" }),
+  inspectMediaRange: (url) => requestPublic(url, { method: "GET", accept: "image/*", provider: "Activision Games Blog", rangeBytes: 4096 })
 }) : null;
 const activisionActivated = activisionAdapter?.isEligibleForCoverage(queries) === true;
 report.editorial_trial.activision_games_blog_activated = activisionActivated;
@@ -282,7 +315,8 @@ for (const query of queries) {
       Object.assign(report.editorial_trial, {
         activision_games_blog_article_requests: metrics.article_requests,
         activision_games_blog_media_preflights: metrics.media_preflights,
-        activision_games_blog_source_failures: metrics.source_failures
+        activision_games_blog_source_failures: metrics.source_failures,
+        activision_games_blog_source_failure_details: metrics.source_failure_details
       });
     }
   }
