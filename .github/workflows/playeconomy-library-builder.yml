@@ -6,11 +6,11 @@ on:
       content_file:
         description: Asset brief used only to populate the reusable library
         required: true
-        default: content/guitar-hero.json
+        default: library/briefs/guitar-hero.json
       max_downloads:
         description: Maximum assets to add in this run
         required: true
-        default: "5"
+        default: "20"
       dry_run:
         description: Analyze only; do not download or write to Drive
         required: true
@@ -33,7 +33,7 @@ jobs:
   build-library:
     name: Populate reusable asset library
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
