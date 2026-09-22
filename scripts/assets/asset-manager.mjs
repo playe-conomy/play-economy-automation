@@ -6,6 +6,7 @@ import { hydrateDriveCatalog, persistDriveCatalog, persistBootstrapOnly, prepare
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
 import { createActivisionGamesBlogAdapter } from "./activision-games-blog.mjs";
 import { createPlayStationBlogAdapter } from "./playstation-blog.mjs";
+import { createSonyDesignAdapter } from "./sony-design.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
 import { searchWikimedia } from "./wikimedia.mjs";
@@ -291,11 +292,18 @@ const playstationAdapter = report.rights.effective_copyrighted_editorial_permiss
 }) : null;
 const playstationActivated = playstationAdapter?.isEligibleForCoverage(queries) === true;
 
+const sonyDesignAdapter = report.rights.effective_copyrighted_editorial_permission ? createSonyDesignAdapter({
+  fetchPage: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "Sony Design" }),
+  inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "Sony Design" })
+}) : null;
+const sonyDesignActivated = sonyDesignAdapter?.isEligibleForCoverage(queries) === true;
+
 const providers = [
   { name: "Openverse", search: (query) => searchOpenverse(query, limits, (url, _limits, provider) => request(url, provider)) },
   { name: "Wikimedia", search: (query) => searchWikimedia(query, limits, (url, _limits, provider) => request(url, provider)) },
   ...(activisionActivated ? [activisionAdapter] : []),
-  ...(playstationActivated ? [playstationAdapter] : [])
+  ...(playstationActivated ? [playstationAdapter] : []),
+  ...(sonyDesignActivated ? [sonyDesignAdapter] : [])
 ];
 
 const eligible = [];
