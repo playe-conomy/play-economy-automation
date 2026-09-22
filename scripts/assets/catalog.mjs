@@ -339,7 +339,7 @@ export function classifyAsset(candidate, query) {
   if (query.intent === "map" && related) return { role: "map", category: "Mapas", entity: query.target_entity, confidence: "high" };
   if (query.intent === "playeconomy_graphic") return { role: "playeconomy_graphic", category: "Gráficos PLAYECONOMY", entity: null, confidence: "high" };
   if (query.intent === "company" && (related || companyEvidence)) return { role: "company", category: "Empresas", entity: query.target_entity, confidence: "high" };
-  if (query.intent === "console" && consoleEvidence) return { role: "console", category: "Consolas", entity: query.target_entity, confidence: "high" };
+  if (query.intent === "console" && related && consoleEvidence) return { role: "console", category: "Consolas", entity: query.target_entity, confidence: "high" };
   if (query.intent === "specific" && related) return { role: "specific", category: "Franquicias", entity: query.target_entity, confidence: "high" };
   if (query.intent === "technology") return { role: "technology", category: "Tecnología", entity: null, confidence: technologyEvidence ? "high" : "medium" };
   if (query.intent === "contextual_broll" || technologyEvidence) return { role: "contextual_broll", category: "Tecnología", entity: null, confidence: technologyEvidence ? "medium" : "low" };
