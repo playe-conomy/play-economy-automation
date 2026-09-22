@@ -112,35 +112,38 @@
         "id": "sony-design-playstation",
         "approved": true,
         "domains": [
-          "www.sony.com"
+          "www.sony.com",
+          "www.playstation.com"
         ],
         "cdn_domains": [
-          "www.sony.com"
+          "www.sony.com",
+          "www.playstation.com"
         ],
         "source_types": [
-          "sony_design_gallery"
+          "sony_design_gallery",
+          "playstation_history_page"
         ],
         "approved_static_assets": [],
         "pages": [
           {
             "target_entity": "PlayStation/PS1",
-            "page_url": "https://www.sony.com/en/SonyInfo/IR/library/ar/SonyAR04-E.pdf"
+            "page_url": "https://www.playstation.com/en-us/playstation-history/1994-ps-one/"
           },
           {
             "target_entity": "PlayStation/PS2",
-            "page_url": "https://www.sony.com/en/SonyInfo/design/gallery/PlayStation2/"
+            "page_url": "https://www.playstation.com/en-ca/playstation-history/2000-ps2-psp/"
           },
           {
             "target_entity": "PlayStation/PS3",
-            "page_url": "https://www.sony.com/en/SonyInfo/IR/news/20120919_01_E.pdf"
+            "page_url": "https://www.playstation.com/en-ca/playstation-history/2007-ps3-ps-vita/"
           },
           {
             "target_entity": "PlayStation/PS4",
-            "page_url": "https://www.sony.com/en/SonyInfo/design/gallery/PlayStation4/"
+            "page_url": "https://www.playstation.com/es-es/playstation-history/2013-ps4-ps-vr/"
           },
           {
             "target_entity": "PlayStation/PS5",
-            "page_url": "https://www.sony.com/en/SonyInfo/design/gallery/PS5/"
+            "page_url": "https://www.playstation.com/en-us/playstation-history/2020-ps5-ps-vr2/"
           }
         ]
       }
