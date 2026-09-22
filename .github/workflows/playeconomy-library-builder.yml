@@ -6,7 +6,7 @@ on:
       content_file:
         description: Asset brief used only to populate the reusable library
         required: true
-        default: library/briefs/master-general.json
+        default: library/briefs/consolas-playstation.json
       max_downloads:
         description: Maximum assets to add in this run
         required: true
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Verify Google Drive OAuth secrets
         env:
