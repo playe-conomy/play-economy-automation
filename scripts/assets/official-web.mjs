@@ -29,8 +29,33 @@ export function createOfficialWebAdapter({ registryEntry, fetchPage, inspectMedi
     name:providerName,
     isEligibleForCoverage(queries){ return registryEntry?.approved===true && queries.some(q=>(registryEntry.pages||[]).some(p=>String(p.target_entity).toLowerCase()===String(q.target_entity||"").toLowerCase())); },
     async search(query){
-      const pages=(registryEntry?.pages||[]).filter(p=>String(p.target_entity).toLowerCase()===String(query.target_entity||"").toLowerCase());
+      const target=String(query.target_entity||"").toLowerCase();
+      const pages=(registryEntry?.pages||[]).filter(p=>String(p.target_entity).toLowerCase()===target);
+      const staticAssets=(registryEntry?.approved_static_assets||[]).filter(a=>String(a.target_entity||"").toLowerCase()===target);
       const out=[];
+      for (const asset of staticAssets) {
+        try {
+          if (!hostAllowed(asset.asset_url, domains) || !hostAllowed(asset.page_url, domains)) continue;
+          const page=await fetchPage(asset.page_url);
+          if (!page?.ok || !hostAllowed(page.url,domains)) continue;
+          const media=await inspectMedia(asset.asset_url);
+          const mime=String(media?.contentType||asset.mime_type||"").split(";",1)[0].trim().toLowerCase();
+          if (!media?.ok || !mime.startsWith("image/")) continue;
+          out.push({
+            provider:String(registryEntry.id),type:"image",
+            title:String(query.target_entity)+" verified official hardware",
+            description:"Verified first-party official asset for "+String(query.target_entity)+".",
+            tags:[String(query.target_entity),"official","console",owner],
+            sourceUrl:asset.asset_url,downloadUrl:asset.asset_url,creator:null,license:null,licenseUrl:null,
+            attribution:owner+" / "+providerName,width:asset.width||null,height:asset.height||null,mimeType:mime,
+            rights_class:"copyrighted_editorial",copyright_owner:owner,
+            source_type:asset.source_type||"official_static_asset",provenance_page_url:asset.page_url,
+            source_domain:new URL(asset.asset_url).hostname.toLowerCase(),retrieved_at:new Date().toISOString(),
+            editorial_use_only:true,license_status:"no_open_license_identified",
+            provenance_status:"verified_first_party",official_source_registry_id:registryEntry.id
+          });
+        } catch {}
+      }
       for(const spec of pages){
         try{
           const page=await fetchPage(spec.page_url);
