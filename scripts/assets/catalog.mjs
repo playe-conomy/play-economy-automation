@@ -148,6 +148,26 @@ function includesPhrase(text, phrase) {
   return Boolean(phrase) && (` ${text} `).includes(` ${phrase} `);
 }
 
+function entityAliases(value = "") {
+  const normalized = normalizeText(value);
+  const aliases = {
+    "playstation ps1": ["playstation", "ps1", "playstation 1", "playstation one"],
+    "playstation ps2": ["playstation 2", "ps2", "playstation2"],
+    "playstation ps3": ["playstation 3", "ps3", "playstation3"],
+    "playstation ps4": ["playstation 4", "ps4", "playstation4"],
+    "playstation ps5": ["playstation 5", "ps5", "playstation5"],
+    "playstation ps5 pro": ["playstation 5 pro", "ps5 pro", "playstation5 pro"],
+    "sony": ["sony", "sony interactive entertainment", "sie"]
+  };
+  const direct = aliases[normalized] ?? [];
+  const tail = normalized.includes("/") ? normalizeText(normalized.split("/").pop()) : "";
+  return [...new Set([normalized, tail, ...direct].filter(Boolean))];
+}
+
+function matchesEntity(text, value) {
+  return entityAliases(value).some((alias) => includesPhrase(text, alias));
+}
+
 function visualEvidence(text) {
   return {
     cover: /\b(?:cover(?: art| artwork)?|box art|game box|key art|sleeve)\b/.test(text),
@@ -305,11 +325,11 @@ export function classifyAsset(candidate, query) {
   const { title, metadata } = candidateText(candidate);
   const text = `${title} ${metadata}`.trim();
   const target = normalizeText(query.target_entity ?? query.primary ?? "");
-  const related = includesPhrase(title, target) || includesPhrase(metadata, target);
+  const related = matchesEntity(title, target) || matchesEntity(metadata, target);
   const evidence = visualEvidence(text);
   const gameplayEvidence = evidence.gameplay;
   const companyEvidence = /activision|electronic arts|microsoft|sony|nintendo/.test(text);
-  const consoleEvidence = /playstation|xbox|nintendo|console|ps2|ps3|ps4/.test(text);
+  const consoleEvidence = /playstation|xbox|nintendo|console|ps1|ps2|ps3|ps4|ps5/.test(text);
   const technologyEvidence = /electric guitar|guitar|controller|peripheral|accessor|turntable/.test(text);
   if (query.intent === "gameplay" && related && gameplayEvidence) return { role: "gameplay", category: "Gameplay", entity: query.target_entity, confidence: "high" };
   if (query.intent === "character" && related) return { role: "character", category: "Personajes", entity: query.target_entity, confidence: "high" };
@@ -330,8 +350,8 @@ export function semanticRelevance(candidate, query, classification = classifyAss
   const { title, metadata } = candidateText(candidate);
   const combined = `${title} ${metadata}`.trim();
   const target = normalizeText(query.target_entity ?? query.primary ?? "");
-  const titleTargetMatch = includesPhrase(title, target);
-  const metadataTargetMatch = includesPhrase(metadata, target);
+  const titleTargetMatch = matchesEntity(title, target);
+  const metadataTargetMatch = matchesEntity(metadata, target);
   const targetMatched = titleTargetMatch || metadataTargetMatch;
   const evidence = visualEvidence(combined);
   const queryTerms = meaningfulTerms(query.text);
