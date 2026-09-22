@@ -286,7 +286,7 @@ report.editorial_trial.activision_games_blog_activated = activisionActivated;
 
 const playstationAdapter = report.rights.effective_copyrighted_editorial_permission ? createPlayStationBlogAdapter({
   registry: rightsConfig.official_source_registry,
-  fetchArticle: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "PlayStation Blog" }),
+  fetchArticle: (url) => requestPublic(url, { method: "GET", accept: "*/*", provider: "PlayStation Blog" }),
   inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "PlayStation Blog" })
 }) : null;
 const playstationActivated = playstationAdapter?.isEligibleForCoverage(queries) === true;
