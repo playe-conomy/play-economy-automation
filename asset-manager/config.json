@@ -15,7 +15,7 @@
     "preferVertical": false
   },
   "rights": {
-    "copyrighted_editorial_enabled": false,
+    "copyrighted_editorial_enabled": true,
     "official_source_registry": [
       {
         "id": "activision-games-blog-guitar-hero-live",
@@ -59,6 +59,41 @@
             "target_entity": "Guitar Hero",
             "width": 1280,
             "height": 508,
+            "mime_type": "image/jpeg"
+          }
+        ]
+      },
+      {
+        "id": "playstation-blog-hardware",
+        "approved": true,
+        "domains": [
+          "blog.playstation.com"
+        ],
+        "cdn_domains": [
+          "blog.playstation.com"
+        ],
+        "source_types": [
+          "playstation_blog_article"
+        ],
+        "approved_static_assets": [
+          {
+            "page_url": "https://blog.playstation.com/2024/09/10/welcome-playstation-5-pro-the-most-visually-impressive-way-to-play-games-on-playstation/",
+            "asset_url": "https://blog.playstation.com/uploads/2024/09/9ae4d532324423584e5151313780c0348918b067.jpg",
+            "role": "console",
+            "editorial_form": "product",
+            "target_entity": "PlayStation/PS5 Pro",
+            "width": 1000,
+            "height": 563,
+            "mime_type": "image/jpeg"
+          },
+          {
+            "page_url": "https://blog.playstation.com/2024/09/10/welcome-playstation-5-pro-the-most-visually-impressive-way-to-play-games-on-playstation/",
+            "asset_url": "https://blog.playstation.com/uploads/2024/09/9dfc19873f8cd02922ce4c7e3cb38d229456b2da.jpg",
+            "role": "console",
+            "editorial_form": "product",
+            "target_entity": "PlayStation/PS5 Pro",
+            "width": 1000,
+            "height": 563,
             "mime_type": "image/jpeg"
           }
         ]
