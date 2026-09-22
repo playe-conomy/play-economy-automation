@@ -27,7 +27,7 @@ export function createOfficialWebAdapter({ registryEntry, fetchPage, inspectMedi
   const domains=[...(registryEntry?.domains||[]),...(registryEntry?.cdn_domains||[])].map(x=>x.toLowerCase());
   return {
     name:providerName,
-    isEligibleForCoverage(queries){ return registryEntry?.approved===true && queries.some(q=>(registryEntry.pages||[]).some(p=>String(p.target_entity).toLowerCase()===String(q.target_entity||"").toLowerCase())); },
+    isEligibleForCoverage(queries){ return registryEntry?.approved===true && queries.some(q=>[...(registryEntry.pages||[]),...(registryEntry.approved_static_assets||[])].some(p=>String(p.target_entity||"").toLowerCase()===String(q.target_entity||"").toLowerCase())); },
     async search(query){
       const target=String(query.target_entity||"").toLowerCase();
       const pages=(registryEntry?.pages||[]).filter(p=>String(p.target_entity).toLowerCase()===target);
