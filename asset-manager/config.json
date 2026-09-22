@@ -97,6 +97,20 @@
             "mime_type": "image/jpeg"
           }
         ]
+      },
+      {
+        "id": "sony-design-playstation",
+        "approved": true,
+        "domains": [
+          "www.sony.com"
+        ],
+        "cdn_domains": [
+          "www.sony.com"
+        ],
+        "source_types": [
+          "sony_design_gallery"
+        ],
+        "approved_static_assets": []
       }
     ]
   },
