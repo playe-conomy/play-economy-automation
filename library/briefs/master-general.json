@@ -1,0 +1,27 @@
+{
+  "id": "library-master-general",
+  "scenes": [],
+  "entities": {
+    "franchises": ["GTA","Resident Evil","Guitar Hero","Prince of Persia","Halo","The Legend of Zelda","Mario","Burnout","Def Jam"],
+    "companies": ["Sony","Microsoft","Nintendo","EA","Activision","Ubisoft","Rockstar Games","Capcom","SEGA","Valve"],
+    "themes": ["video game consoles","gaming history","video game companies","gameplay","video game characters","video game maps","official game art","concept art","gaming technology"]
+  },
+  "visual_queries": [
+    {"query":"PlayStation console generations","intent":"console","target_category":"Consolas","target_entity":"PlayStation"},
+    {"query":"Xbox console generations","intent":"console","target_category":"Consolas","target_entity":"Xbox"},
+    {"query":"Nintendo console generations","intent":"console","target_category":"Consolas","target_entity":"Nintendo"},
+    {"query":"video game company logos Sony Microsoft Nintendo EA Activision Ubisoft Rockstar Capcom SEGA Valve","intent":"company","target_category":"Empresas","target_entity":null},
+    {"query":"GTA Resident Evil Guitar Hero Halo Zelda Mario Burnout game cover art","intent":"cover_art","target_category":"Franquicias","target_entity":null},
+    {"query":"GTA Resident Evil Guitar Hero Halo Zelda Mario Burnout gameplay","intent":"gameplay","target_category":"Gameplay","target_entity":null},
+    {"query":"video game characters Mario Link Master Chief Leon Kennedy","intent":"character","target_category":"Personajes","target_entity":null},
+    {"query":"video game maps GTA Zelda Halo","intent":"map","target_category":"Mapas","target_entity":null}
+  ],
+  "asset_requirements": [
+    {"kind":"console","description":"Reusable console library","queries":["PlayStation console","Xbox console","Nintendo console"]},
+    {"kind":"company","description":"Reusable video game company library","queries":["video game company logos"]},
+    {"kind":"specific","description":"Reusable franchise library","queries":["video game cover art","official promotional game artwork"]},
+    {"kind":"gameplay","description":"Reusable gameplay library","queries":["video game gameplay screenshots"]},
+    {"kind":"character","description":"Reusable character library","queries":["video game characters"]},
+    {"kind":"map","description":"Reusable maps library","queries":["video game maps"]}
+  ]
+}
