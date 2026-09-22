@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "description": "Plan maestro independiente para poblar la biblioteca reutilizable de PLAYECONOMY.",
+  "batches": [
+    {"id":"consolas-playstation","category":"Consolas","entities":["PlayStation","PS1","PS2","PS3","PS4","PS5","PS5 Pro"],"roles":["console","official_art","technology"]},
+    {"id":"consolas-xbox","category":"Consolas","entities":["Xbox","Xbox 360","Xbox One","Xbox Series S","Xbox Series X"],"roles":["console","official_art","technology"]},
+    {"id":"consolas-nintendo","category":"Consolas","entities":["NES","SNES","Nintendo 64","GameCube","Wii","Wii U","Nintendo Switch","Nintendo Switch 2"],"roles":["console","official_art","technology"]},
+    {"id":"empresas","category":"Empresas","entities":["Sony","Microsoft","Nintendo","EA","Activision","Ubisoft","Rockstar Games","Capcom","SEGA","Valve"],"roles":["company","official_art"]},
+    {"id":"franquicias-core","category":"Franquicias","entities":["GTA","Resident Evil","Guitar Hero","Prince of Persia","Halo","The Legend of Zelda","Mario","Burnout","Def Jam"],"roles":["cover_art","official_art","specific"]},
+    {"id":"gameplay-core","category":"Gameplay","entities":["GTA","Resident Evil","Guitar Hero","Prince of Persia","Halo","The Legend of Zelda","Mario","Burnout","Def Jam"],"roles":["gameplay"]},
+    {"id":"personajes","category":"Personajes","entities":["Mario","Link","Master Chief","Leon S. Kennedy","CJ","Niko Bellic"],"roles":["character","official_art"]},
+    {"id":"mapas","category":"Mapas","entities":["GTA","The Legend of Zelda","Halo"],"roles":["map","official_art"]},
+    {"id":"arte-conceptual","category":"Concept Art","entities":["PlayStation","Xbox","Nintendo","GTA","Resident Evil","Halo","The Legend of Zelda","Mario"],"roles":["official_art","specific"]},
+    {"id":"tecnologia","category":"Tecnología","entities":["GPU","CPU","RAM","SSD","semiconductors","ray tracing"],"roles":["technology","contextual_broll"]}
+  ]
+}
