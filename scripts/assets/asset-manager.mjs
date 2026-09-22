@@ -7,6 +7,7 @@ import { artifactCachePath, downloadCandidate, shouldDownload } from "./download
 import { createActivisionGamesBlogAdapter } from "./activision-games-blog.mjs";
 import { createPlayStationBlogAdapter } from "./playstation-blog.mjs";
 import { createSonyDesignAdapter } from "./sony-design.mjs";
+import { createOfficialWebAdapter } from "./official-web.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
 import { searchWikimedia } from "./wikimedia.mjs";
@@ -298,12 +299,23 @@ const sonyDesignAdapter = report.rights.effective_copyrighted_editorial_permissi
 }) : null;
 const sonyDesignActivated = sonyDesignAdapter?.isEligibleForCoverage(queries) === true;
 
+const sonyRegistry = (rightsConfig.official_source_registry || []).find((item) => item?.id === "sony-design-playstation");
+const officialSonyAdapter = report.rights.effective_copyrighted_editorial_permission && sonyRegistry ? createOfficialWebAdapter({
+  registryEntry: sonyRegistry,
+  fetchPage: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "Sony Official Web" }),
+  inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "Sony Official Web" }),
+  owner: "Sony Group Corporation",
+  providerName: "Sony Design"
+}) : null;
+const officialSonyActivated = officialSonyAdapter?.isEligibleForCoverage(queries) === true;
+
 const providers = [
   { name: "Openverse", search: (query) => searchOpenverse(query, limits, (url, _limits, provider) => request(url, provider)) },
   { name: "Wikimedia", search: (query) => searchWikimedia(query, limits, (url, _limits, provider) => request(url, provider)) },
   ...(activisionActivated ? [activisionAdapter] : []),
   ...(playstationActivated ? [playstationAdapter] : []),
-  ...(sonyDesignActivated ? [sonyDesignAdapter] : [])
+  ...(sonyDesignActivated ? [sonyDesignAdapter] : []),
+  ...(officialSonyActivated ? [officialSonyAdapter] : [])
 ];
 
 const eligible = [];
