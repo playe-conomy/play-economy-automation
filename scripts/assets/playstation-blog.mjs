@@ -22,8 +22,13 @@ export function createPlayStationBlogAdapter({ registry, fetchArticle, inspectMe
           if (!cache.has(asset.page_url)) cache.set(asset.page_url, fetchArticle(asset.page_url));
           const page = await cache.get(asset.page_url);
           if (!page || page.ok !== true || new URL(page.url).hostname.toLowerCase() !== "blog.playstation.com") continue;
-          const media = await inspectMedia(asset.asset_url);
-          if (!media || media.ok !== true || !String(media.contentType || "").toLowerCase().startsWith("image/")) continue;
+          let media = await inspectMedia(asset.asset_url);
+          let observedType = String(media?.contentType || "").split(";", 1)[0].trim().toLowerCase();
+          if (!media || media.ok !== true || !observedType.startsWith("image/")) {
+            media = await fetchArticle(asset.asset_url);
+            observedType = String(media?.contentType || "").split(";", 1)[0].trim().toLowerCase();
+          }
+          if (!media || media.ok !== true || !observedType.startsWith("image/")) continue;
           output.push({
             provider: "playstation-blog",
             type: "image",
