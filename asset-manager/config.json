@@ -1,9 +1,9 @@
 {
   "userAgent": "PlayEconomyAssetManager/3.0 (https://github.com/playe-conomy/play-economy-automation)",
   "limits": {
-    "maxQueries": 8,
-    "resultsPerQuery": 4,
-    "maxDownloads": 5,
+    "maxQueries": 12,
+    "resultsPerQuery": 6,
+    "maxDownloads": 20,
     "maxRetries": 2,
     "backoffMs": 500,
     "httpTimeoutMs": 10000,
@@ -12,7 +12,7 @@
   },
   "scoring": {
     "minimumScore": 38,
-    "preferVertical": true
+    "preferVertical": false
   },
   "rights": {
     "copyrighted_editorial_enabled": false,
@@ -20,9 +20,16 @@
       {
         "id": "activision-games-blog-guitar-hero-live",
         "approved": true,
-        "domains": ["blog.activision.com"],
-        "cdn_domains": ["community.activision.com", "blog.activision.com"],
-        "source_types": ["activision_games_blog_article"],
+        "domains": [
+          "blog.activision.com"
+        ],
+        "cdn_domains": [
+          "community.activision.com",
+          "blog.activision.com"
+        ],
+        "source_types": [
+          "activision_games_blog_article"
+        ],
         "approved_static_assets": [
           {
             "page_url": "https://blog.activision.com/guitar-hero/archives/guitar-hero-live-introducing-hero-powers",
@@ -61,6 +68,17 @@
   "drive": {
     "rootFolderId": "1fHW2P2RAASkGXYzT7Cl2BvcrephFZn27",
     "libraryRoot": "02_Biblioteca Visual",
-    "categories": ["Empresas", "Franquicias", "Consolas", "Gameplay", "Personajes", "Mapas", "Arte Oficial", "Concept Art", "Tecnología", "Gráficos PLAYECONOMY"]
+    "categories": [
+      "Empresas",
+      "Franquicias",
+      "Consolas",
+      "Gameplay",
+      "Personajes",
+      "Mapas",
+      "Arte Oficial",
+      "Concept Art",
+      "Tecnología",
+      "Gráficos PLAYECONOMY"
+    ]
   }
 }
