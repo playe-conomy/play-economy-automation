@@ -96,6 +96,16 @@
             "height": 563,
             "mime_type": "image/jpeg"
           }
+        ],
+        "pages": [
+          {
+            "target_entity": "PlayStation/PS5 Pro",
+            "page_url": "https://blog.playstation.com/2024/09/10/welcome-playstation-5-pro-the-most-visually-impressive-way-to-play-games-on-playstation/"
+          },
+          {
+            "target_entity": "PlayStation/PS5 Pro",
+            "page_url": "https://blog.playstation.com/2024/11/07/getting-started-with-playstation-5-pro-out-today/"
+          }
         ]
       },
       {
@@ -113,8 +123,16 @@
         "approved_static_assets": [],
         "pages": [
           {
+            "target_entity": "PlayStation/PS1",
+            "page_url": "https://www.sony.com/en/SonyInfo/IR/library/ar/SonyAR04-E.pdf"
+          },
+          {
             "target_entity": "PlayStation/PS2",
             "page_url": "https://www.sony.com/en/SonyInfo/design/gallery/PlayStation2/"
+          },
+          {
+            "target_entity": "PlayStation/PS3",
+            "page_url": "https://www.sony.com/en/SonyInfo/IR/news/20120919_01_E.pdf"
           },
           {
             "target_entity": "PlayStation/PS4",
