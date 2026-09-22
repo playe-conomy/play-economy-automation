@@ -153,6 +153,32 @@ if (!bootstrapOnly) {
 report.library.reusable_assets_found = manifest.assets.filter((asset) => asset.reusable && ["approved", "uploaded"].includes(asset.status)).length;
 
 function queriesFromContent() {
+  // Library briefs declare their searches explicitly. Preserve those queries instead
+  // of converting them through the scene/video coverage planner.
+  if (Array.isArray(content.visual_queries) && content.visual_queries.length) {
+    const planned = content.visual_queries.slice(0, Math.max(0, limits.maxQueries)).map((entry) => ({
+      text: entry.query,
+      primary: entry.query,
+      intent: entry.intent ?? "specific",
+      asset_role: entry.intent ?? "specific",
+      target_entity: entry.target_entity ?? null,
+      target_category: entry.target_category ?? null,
+      preferred_editorial_form: entry.preferred_editorial_form ?? null
+    }));
+    report.coverage.requirements = planned.map((query) => ({
+      entity: query.target_entity,
+      asset_role: query.asset_role,
+      preferred_editorial_form: query.preferred_editorial_form
+    }));
+    report.coverage.planned_queries = planned.map((query) => ({
+      entity: query.target_entity,
+      asset_role: query.asset_role,
+      preferred_editorial_form: query.preferred_editorial_form,
+      target_category: query.target_category,
+      query: query.text
+    }));
+    return planned;
+  }
   const planned = planEditorialQueries(content, { maxQueries: limits.maxQueries });
   report.coverage.requirements = deriveCoverageRequirements(content);
   report.coverage.planned_queries = planned.map((query) => ({ entity: query.entity, asset_role: query.asset_role, preferred_editorial_form: query.preferred_editorial_form, query: query.text }));
