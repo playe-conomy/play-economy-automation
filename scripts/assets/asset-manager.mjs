@@ -5,6 +5,7 @@ import { driveAuthenticatedIdentity, driveConfiguration, resolveAssetDestination
 import { hydrateDriveCatalog, persistDriveCatalog, persistBootstrapOnly, prepareBootstrapOnly } from "./drive-catalog.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
 import { createActivisionGamesBlogAdapter } from "./activision-games-blog.mjs";
+import { createPlayStationBlogAdapter } from "./playstation-blog.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
 import { searchWikimedia } from "./wikimedia.mjs";
@@ -283,10 +284,18 @@ const activisionAdapter = report.rights.effective_copyrighted_editorial_permissi
 const activisionActivated = activisionAdapter?.isEligibleForCoverage(queries) === true;
 report.editorial_trial.activision_games_blog_activated = activisionActivated;
 
+const playstationAdapter = report.rights.effective_copyrighted_editorial_permission ? createPlayStationBlogAdapter({
+  registry: rightsConfig.official_source_registry,
+  fetchArticle: (url) => requestPublic(url, { method: "GET", accept: "text/html", provider: "PlayStation Blog" }),
+  inspectMedia: (url) => requestPublic(url, { method: "HEAD", accept: "image/*", provider: "PlayStation Blog" })
+}) : null;
+const playstationActivated = playstationAdapter?.isEligibleForCoverage(queries) === true;
+
 const providers = [
   { name: "Openverse", search: (query) => searchOpenverse(query, limits, (url, _limits, provider) => request(url, provider)) },
   { name: "Wikimedia", search: (query) => searchWikimedia(query, limits, (url, _limits, provider) => request(url, provider)) },
-  ...(activisionActivated ? [activisionAdapter] : [])
+  ...(activisionActivated ? [activisionAdapter] : []),
+  ...(playstationActivated ? [playstationAdapter] : [])
 ];
 
 const eligible = [];
