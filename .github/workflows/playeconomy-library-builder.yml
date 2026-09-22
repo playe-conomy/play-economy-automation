@@ -6,7 +6,7 @@ on:
       content_file:
         description: Asset brief used only to populate the reusable library
         required: true
-        default: library/briefs/guitar-hero.json
+        default: library/briefs/master-general.json
       max_downloads:
         description: Maximum assets to add in this run
         required: true
