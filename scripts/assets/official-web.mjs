@@ -13,14 +13,16 @@ function collect(html, pageUrl, allowed) {
     const url=abs(pageUrl,raw);
     if (url && /^https:/.test(url) && hostAllowed(url,allowed) && !found.some(x=>x.url===url)) found.push({url,kind});
   };
-  const text=String(html||"");
+  const text=String(html||"").replace(/\\u002F/gi,"/").replace(/\\u0026/gi,"&").replace(/\\u003A/gi,":").replace(/\\\//g,"/");
   for (const m of text.matchAll(/<meta\b[^>]*(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*content=["']([^"']+)["'][^>]*>/gi)) add(m[1],"meta");
   for (const m of text.matchAll(/<meta\b[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*>/gi)) add(m[1],"meta");
   for (const m of text.matchAll(/<(?:img|source)\b[^>]*(?:src|data-src|data-lazy-src)=["']([^"']+)["'][^>]*>/gi)) add(m[1],"image");
   for (const m of text.matchAll(/<(?:img|source)\b[^>]*(?:srcset|data-srcset)=["']([^"']+)["'][^>]*>/gi))
     for (const part of m[1].split(",")) add(part.trim().split(/\s+/)[0],"srcset");
   for (const m of text.matchAll(/url\(["']?([^"')]+)["']?\)/gi)) add(m[1],"css");
-  for (const m of text.matchAll(/["'](https:\/\/[^"'\\]+?\.(?:jpe?g|png|webp)(?:\?[^"'\\]*)?)["']/gi)) add(m[1],"json");
+  for (const m of text.matchAll(/["'](https:\/\/[^"'\\]+?\.(?:jpe?g|png|webp|avif)(?:\?[^"'\\]*)?)["']/gi)) add(m[1],"json");
+  for (const m of text.matchAll(/(?:src|url|image|desktop|mobile|media)["']?\\s*[:=]\\s*["']([^"']+\.(?:jpe?g|png|webp|avif)(?:\?[^"']*)?)["']/gi)) add(m[1],"structured");
+  for (const m of text.matchAll(/https:\/\/[^\\s"'<>\\]+\.(?:jpe?g|png|webp|avif)(?:\?[^\\s"'<>\\]*)?/gi)) add(m[0],"absolute");
   return found;
 }
 export function createOfficialWebAdapter({ registryEntry, fetchPage, inspectMedia, owner, providerName }) {
