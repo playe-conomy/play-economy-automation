@@ -148,6 +148,38 @@
             "target_entity": "PlayStation/PS5",
             "page_url": "https://www.playstation.com/en-us/playstation-history/2020-ps5-ps-vr2/"
           }
+        ],
+        "approved_described_assets": [
+          {
+            "target_entity": "PlayStation/PS1",
+            "page_url": "https://www.playstation.com/en-us/playstation-history/1994-ps-one/",
+            "descriptor": "original PlayStation console"
+          },
+          {
+            "target_entity": "PlayStation/PS2",
+            "page_url": "https://www.playstation.com/en-ca/playstation-history/2000-ps2-psp/",
+            "descriptor": "PlayStation 2 console"
+          },
+          {
+            "target_entity": "PlayStation/PS3",
+            "page_url": "https://www.playstation.com/en-ca/playstation-history/2007-ps3-ps-vita/",
+            "descriptor": "original PlayStation 3 console"
+          },
+          {
+            "target_entity": "PlayStation/PS4",
+            "page_url": "https://www.playstation.com/es-es/playstation-history/2013-ps4-ps-vr/",
+            "descriptor": "PlayStation 4"
+          },
+          {
+            "target_entity": "PlayStation/PS5",
+            "page_url": "https://www.playstation.com/en-us/playstation-history/2020-ps5-ps-vr2/",
+            "descriptor": "PlayStation 5 console"
+          },
+          {
+            "target_entity": "PlayStation/PS5 Pro",
+            "page_url": "https://www.playstation.com/en-us/playstation-history/2020-ps5-ps-vr2/",
+            "descriptor": "PS5 Pro"
+          }
         ]
       }
     ]
