@@ -1,0 +1,105 @@
+name: PlayEconomy Library Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_file:
+        description: Asset brief used only to populate the reusable library
+        required: true
+        default: content/guitar-hero.json
+      max_downloads:
+        description: Maximum assets to add in this run
+        required: true
+        default: "5"
+      dry_run:
+        description: Analyze only; do not download or write to Drive
+        required: true
+        type: boolean
+        default: true
+      enable_editorial_sources:
+        description: Enable configured official/editorial sources for library building
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playeconomy-library-builder
+  cancel-in-progress: false
+
+jobs:
+  build-library:
+    name: Populate reusable asset library
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify Google Drive OAuth secrets
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+        run: |
+          missing=()
+          [[ -n "$GOOGLE_DRIVE_CLIENT_ID" ]] || missing+=(GOOGLE_DRIVE_CLIENT_ID)
+          [[ -n "$GOOGLE_DRIVE_CLIENT_SECRET" ]] || missing+=(GOOGLE_DRIVE_CLIENT_SECRET)
+          [[ -n "$GOOGLE_DRIVE_REFRESH_TOKEN" ]] || missing+=(GOOGLE_DRIVE_REFRESH_TOKEN)
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing required Google Drive OAuth secret(s): ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Exchange Google Drive OAuth refresh token
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          curl --fail --silent --show-error --request POST "https://oauth2.googleapis.com/token"             --header "Content-Type: application/x-www-form-urlencoded"             --data-urlencode "client_id=$GOOGLE_DRIVE_CLIENT_ID"             --data-urlencode "client_secret=$GOOGLE_DRIVE_CLIENT_SECRET"             --data-urlencode "refresh_token=$GOOGLE_DRIVE_REFRESH_TOKEN"             --data-urlencode "grant_type=refresh_token"             --output "$response_file"
+          access_token="$(node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!r.access_token)process.exit(1);process.stdout.write(r.access_token)' "$response_file")"
+          echo "::add-mask::$access_token"
+          printf 'GOOGLE_DRIVE_ACCESS_TOKEN=%s\n' "$access_token" >> "$GITHUB_ENV"
+
+      - name: Prepare library policy
+        env:
+          ENABLE_EDITORIAL: ${{ inputs.enable_editorial_sources }}
+        run: |
+          set -euo pipefail
+          library_config="$RUNNER_TEMP/playeconomy-library-config.json"
+          node -e '
+            const fs=require("fs");
+            const [src,dst,enabled]=process.argv.slice(1);
+            const c=JSON.parse(fs.readFileSync(src,"utf8"));
+            c.rights ??= {};
+            c.rights.copyrighted_editorial_enabled = enabled === "true";
+            fs.writeFileSync(dst, JSON.stringify(c,null,2)+"\n");
+          ' asset-manager/config.json "$library_config" "$ENABLE_EDITORIAL"
+          printf 'ASSET_MANAGER_CONFIG_PATH=%s\n' "$library_config" >> "$GITHUB_ENV"
+
+      - name: Populate library
+        run: |
+          set -euo pipefail
+          node scripts/assets/asset-manager.mjs             --config "$ASSET_MANAGER_CONFIG_PATH"             --content "${{ inputs.content_file }}"             --dry-run "${{ inputs.dry_run }}"             --max-downloads "${{ inputs.max_downloads }}"             --allow-copyrighted-editorial "${{ inputs.enable_editorial_sources }}"             --report asset-manager/reports/library-builder-latest.json
+
+      - name: Upload library report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playeconomy-library-builder-report
+          path: |
+            asset-manager/reports/library-builder-latest.json
+            asset-manager/manifest.json
+          if-no-files-found: warn
+          retention-days: 7
