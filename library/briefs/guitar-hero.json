@@ -1,0 +1,24 @@
+{
+  "id": "library-guitar-hero",
+  "scenes": [],
+  "entities": {
+    "franchises": ["Guitar Hero"],
+    "companies": ["Activision"],
+    "themes": ["rhythm game", "guitar controller", "music gaming"]
+  },
+  "visual_queries": [
+    {"query":"Guitar Hero logo","intent":"official_art","target_category":"Franquicias","target_entity":"Guitar Hero"},
+    {"query":"Guitar Hero game cover","intent":"cover_art","target_category":"Franquicias","target_entity":"Guitar Hero"},
+    {"query":"Guitar Hero box art","intent":"cover_art","target_category":"Franquicias","target_entity":"Guitar Hero"},
+    {"query":"Guitar Hero official promotional artwork","intent":"official_art","target_category":"Franquicias","target_entity":"Guitar Hero"},
+    {"query":"Guitar Hero controller guitar","intent":"specific","target_category":"Franquicias","target_entity":"Guitar Hero"},
+    {"query":"Guitar Hero gameplay","intent":"gameplay","target_category":"Gameplay","target_entity":"Guitar Hero"},
+    {"query":"Guitar Hero Live gameplay","intent":"gameplay","target_category":"Gameplay","target_entity":"Guitar Hero"},
+    {"query":"Activision logo","intent":"company","target_category":"Empresas","target_entity":"Activision"}
+  ],
+  "asset_requirements": [
+    {"kind":"specific","description":"Reusable Guitar Hero franchise library","queries":["Guitar Hero logo","Guitar Hero cover art","Guitar Hero controller"]},
+    {"kind":"gameplay","description":"Reusable Guitar Hero gameplay library","queries":["Guitar Hero gameplay","Guitar Hero Live gameplay"]},
+    {"kind":"company","description":"Activision company context","queries":["Activision logo"]}
+  ]
+}
