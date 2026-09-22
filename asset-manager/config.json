@@ -117,7 +117,10 @@
         ],
         "cdn_domains": [
           "www.sony.com",
-          "www.playstation.com"
+          "www.playstation.com",
+          "gmedia.playstation.com",
+          "image.api.playstation.com",
+          "static.playstation.com"
         ],
         "source_types": [
           "sony_design_gallery",
