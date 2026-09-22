@@ -110,7 +110,21 @@
         "source_types": [
           "sony_design_gallery"
         ],
-        "approved_static_assets": []
+        "approved_static_assets": [],
+        "pages": [
+          {
+            "target_entity": "PlayStation/PS2",
+            "page_url": "https://www.sony.com/en/SonyInfo/design/gallery/PlayStation2/"
+          },
+          {
+            "target_entity": "PlayStation/PS4",
+            "page_url": "https://www.sony.com/en/SonyInfo/design/gallery/PlayStation4/"
+          },
+          {
+            "target_entity": "PlayStation/PS5",
+            "page_url": "https://www.sony.com/en/SonyInfo/design/gallery/PS5/"
+          }
+        ]
       }
     ]
   },
