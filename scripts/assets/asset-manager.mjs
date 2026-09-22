@@ -307,7 +307,9 @@ for (const query of queries) {
         const scored = scoreCandidate(candidate, query, { rights });
         const metadata = inspectMetadata(candidate, { rights });
         const duplicate = findDuplicate(manifest, candidate);
-        const destination = resolveAssetDestination(scored.classification.role, { entity: scored.classification.entity });
+        const destinationRole = query.intent ?? scored.classification.role;
+        const destinationEntity = query.target_entity ?? scored.classification.entity;
+        const destination = resolveAssetDestination(destinationRole, { entity: destinationEntity });
         const rejectionReasons = [];
         if (duplicate) rejectionReasons.push("duplicate");
         if (!candidate.sourceUrl || !candidate.downloadUrl) rejectionReasons.push("invalid_url");
@@ -324,7 +326,7 @@ for (const query of queries) {
           report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, role: scored.classification.role, editorial_form: scored.editorialForm, target_entity: query.target_entity ?? null, resolved_destination: destination, rights, semantic_relevance: scored.semantic, rejection_reasons: [...new Set(rejectionReasons)], missing_fields: metadata.missingFields, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, visual_utility: scored.visualUtility, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, license_url: candidate.licenseUrl, width: candidate.width, height: candidate.height } });
           continue;
         }
-        candidate.assetRole = scored.classification.role;
+        candidate.assetRole = query.intent ?? scored.classification.role;
         candidate.rights_class = rights.rightsClass;
         candidate.editorial_form = scored.editorialForm;
         candidate.visual_utility = scored.visualUtility.score;
