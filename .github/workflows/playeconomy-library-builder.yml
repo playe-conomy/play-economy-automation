@@ -18,7 +18,7 @@ on:
       max_downloads:
         description: Maximum assets to add in this run
         required: true
-        default: "20"
+        default: "40"
       dry_run:
         description: Analyze only; do not download or write to Drive
         required: true
