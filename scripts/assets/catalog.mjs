@@ -433,7 +433,7 @@ export function scoreCandidate(candidate, query, { rights = null } = {}) {
     if (ratio >= 0.85) { breakdown.orientation = 10; reasons.push("vertical-friendly"); }
     else { breakdown.orientation = 4; reasons.push("crop-pan-eligible"); }
   }
-  breakdown.license = resolvedRights.rightsClass === RIGHTS_CLASSES.OPEN_LICENSE ? 25 : resolvedRights.rightsClass === RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL && resolvedRights.accepted ? 0 : -60;
+  breakdown.license = resolvedRights.rightsClass === RIGHTS_CLASSES.OPEN_LICENSE ? 10 : resolvedRights.accepted ? 0 : -60;
   reasons.push(resolvedRights.reason);
   if (classification.role === "cover_art") { breakdown.specificity = 35; reasons.push("cover-art-match"); }
   else if (classification.role === "official_art") { breakdown.specificity = 30; reasons.push("official-art-match"); }
