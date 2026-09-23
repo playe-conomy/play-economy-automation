@@ -158,7 +158,13 @@ function entityAliases(value = "") {
     "playstation ps4": ["playstation 4", "ps4", "playstation4"],
     "playstation ps5": ["playstation 5", "ps5", "playstation5"],
     "playstation ps5 pro": ["playstation 5 pro", "ps5 pro", "playstation5 pro"],
-    "sony": ["sony", "sony interactive entertainment", "sie"]
+    "sony": ["sony", "sony interactive entertainment", "sie"],
+    "mario": ["super mario", "mario bros", "mario nintendo", "mario character"],
+    "link": ["link zelda", "link character", "legend of zelda link"],
+    "master chief": ["master chief", "halo master chief"],
+    "leon s kennedy": ["leon s kennedy", "leon kennedy", "resident evil leon"],
+    "cj": ["carl johnson", "gta san andreas cj", "grand theft auto cj"],
+    "niko bellic": ["niko bellic", "gta iv niko", "grand theft auto niko"]
   };
   const direct = aliases[normalized] ?? [];
   const tail = normalized.includes("/") ? normalizeText(normalized.split("/").pop()) : "";
@@ -167,6 +173,29 @@ function entityAliases(value = "") {
 
 function matchesEntity(text, value) {
   return entityAliases(value).some((alias) => includesPhrase(text, alias));
+}
+
+function entityConflict(text, value = "") {
+  const target = normalizeText(value);
+  const rules = [
+    { target: /playstation ps1$/, conflicts: /\b(?:ps2|playstation 2|ps3|playstation 3|ps4|playstation 4|ps5|playstation 5)\b/ },
+    { target: /playstation ps2$/, conflicts: /\b(?:ps1|playstation 1|ps3|playstation 3|ps4|playstation 4|ps5|playstation 5)\b/ },
+    { target: /playstation ps3$/, conflicts: /\b(?:ps1|playstation 1|ps2|playstation 2|ps4|playstation 4|ps5|playstation 5)\b/ },
+    { target: /playstation ps4$/, conflicts: /\b(?:ps1|playstation 1|ps2|playstation 2|ps3|playstation 3|ps5|playstation 5)\b/ },
+    { target: /playstation ps5 pro$/, conflicts: /\b(?:ps1|ps2|ps3|ps4|playstation [1-4])\b/ },
+    { target: /playstation ps5$/, conflicts: /\b(?:ps1|ps2|ps3|ps4|playstation [1-4])\b/ },
+    { target: /gamecube$/, conflicts: /\b(?:playstation|ps[1-5]|xbox|wii|switch|nintendo 64|n64)\b/ },
+    { target: /nintendo 64$/, conflicts: /\b(?:playstation|ps[1-5]|xbox|gamecube|wii|switch)\b/ },
+    { target: /wii u$/, conflicts: /\b(?:playstation|ps[1-5]|xbox|gamecube|switch|nintendo 64|n64)\b/ },
+    { target: /nintendo switch 2$/, conflicts: /\b(?:playstation|ps[1-5]|xbox|gamecube|wii|nintendo 64|n64)\b/ }
+  ];
+  return rules.some((rule) => rule.target.test(target) && rule.conflicts.test(text));
+}
+
+function intentEvidence(text, intent) {
+  if (intent === "map") return /\b(?:map|world map|game map|overworld|atlas|region map|level map)\b/.test(text);
+  if (intent === "character") return /\b(?:character|render|artwork|official art|game|gaming|nintendo|playstation|xbox|halo|zelda|resident evil|grand theft auto|gta|super mario|mario bros)\b/.test(text);
+  return true;
 }
 
 function visualEvidence(text) {
@@ -354,6 +383,8 @@ export function semanticRelevance(candidate, query, classification = classifyAss
   const titleTargetMatch = matchesEntity(title, target);
   const metadataTargetMatch = matchesEntity(metadata, target);
   const targetMatched = titleTargetMatch || metadataTargetMatch;
+  const conflict = entityConflict(combined, target);
+  const typeEvidence = intentEvidence(combined, query.intent);
   const evidence = visualEvidence(combined);
   const queryTerms = meaningfulTerms(query.text);
   const matchedTerms = queryTerms.filter((term) => title.includes(term) || metadata.includes(term));
@@ -392,9 +423,11 @@ export function semanticRelevance(candidate, query, classification = classifyAss
   const requiresTarget = Boolean(target) && ["specific", "gameplay", "character", "cover_art", "official_art", "company", "console", "map"].includes(query.intent);
   const requiresVisualEvidence = ["cover_art", "official_art", "gameplay"].includes(query.intent);
   const contextualEnough = matchedTerms.length >= 2 || contextualPhraseMatch;
-  const targetEnough = targetMatched && (!requiresVisualEvidence || evidence.cover || evidence.official || evidence.gameplay);
+  const targetEnough = targetMatched && !conflict && typeEvidence && (!requiresVisualEvidence || evidence.cover || evidence.official || evidence.gameplay);
   const passed = requiresTarget ? targetEnough : contextualEnough;
-  if (!passed) reasons.push(requiresTarget && !targetMatched ? "target_entity_missing" : "insufficient_concept_match");
+  if (conflict) reasons.push("conflicting_entity_detected");
+  if (!typeEvidence) reasons.push("intent_evidence_missing");
+  if (!passed && !conflict && typeEvidence) reasons.push(requiresTarget && !targetMatched ? "target_entity_missing" : "insufficient_concept_match");
   return {
     score,
     passed,
