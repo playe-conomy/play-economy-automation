@@ -1,13 +1,13 @@
 {
   "userAgent": "PlayEconomyAssetManager/3.0 (https://github.com/playe-conomy/play-economy-automation)",
   "limits": {
-    "maxQueries": 12,
-    "resultsPerQuery": 6,
+    "maxQueries": 26,
+    "resultsPerQuery": 10,
     "maxDownloads": 20,
     "maxRetries": 2,
     "backoffMs": 500,
     "httpTimeoutMs": 10000,
-    "globalTimeoutMs": 240000,
+    "globalTimeoutMs": 480000,
     "maxFileBytes": 15728640
   },
   "scoring": {
