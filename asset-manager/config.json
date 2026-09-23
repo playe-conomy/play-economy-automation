@@ -2,8 +2,8 @@
   "userAgent": "PlayEconomyAssetManager/3.0 (https://github.com/playe-conomy/play-economy-automation)",
   "limits": {
     "maxQueries": 26,
-    "resultsPerQuery": 10,
-    "maxDownloads": 20,
+    "resultsPerQuery": 20,
+    "maxDownloads": 40,
     "maxRetries": 2,
     "backoffMs": 500,
     "httpTimeoutMs": 10000,
@@ -11,7 +11,7 @@
     "maxFileBytes": 15728640
   },
   "scoring": {
-    "minimumScore": 38,
+    "minimumScore": 30,
     "preferVertical": false
   },
   "rights": {
@@ -182,7 +182,9 @@
           }
         ]
       }
-    ]
+    ],
+    "relaxed_library_mode": true,
+    "accept_unknown_or_restricted_licenses": true
   },
   "drive": {
     "rootFolderId": "1fHW2P2RAASkGXYzT7Cl2BvcrephFZn27",
