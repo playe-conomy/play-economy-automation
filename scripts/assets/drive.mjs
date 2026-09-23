@@ -131,10 +131,18 @@ export async function resolveDriveFolder(destination, options = {}) {
   if (!categories.length) throw await driveError("drive_category_missing");
   const categoryFolder = categories[0];
   if (!destination.finalEntity) return { id: categoryFolder.id, path: categoryPath };
-  const entityPath = `${categoryPath}${destination.finalEntity}/`;
-  const entities = await listFolders(categoryFolder.id, destination.finalEntity, "destination_entity_lookup", entityPath, options);
-  const entityFolder = entities[0] ?? await createFolder(destination.finalEntity, categoryFolder.id, entityPath, options);
-  return { id: entityFolder.id, path: entityPath };
+  const entitySegments = String(destination.finalEntity)
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  let parentFolder = categoryFolder;
+  let entityPath = categoryPath;
+  for (const segment of entitySegments) {
+    entityPath += `${segment}/`;
+    const matches = await listFolders(parentFolder.id, segment, "destination_entity_lookup", entityPath, options);
+    parentFolder = matches[0] ?? await createFolder(segment, parentFolder.id, entityPath, options);
+  }
+  return { id: parentFolder.id, path: entityPath };
 }
 
 async function findDriveDuplicate(checksum, options) {
