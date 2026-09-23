@@ -1,0 +1,72 @@
+{
+  "id": "library-mapas",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "GTA",
+      "The Legend of Zelda",
+      "Halo"
+    ],
+    "themes": [
+      "Mapas PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "GTA game map",
+      "intent": "map",
+      "target_category": "Mapas",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "GTA official promotional art",
+      "intent": "official_art",
+      "target_category": "Mapas",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "The Legend of Zelda game map",
+      "intent": "map",
+      "target_category": "Mapas",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "The Legend of Zelda official promotional art",
+      "intent": "official_art",
+      "target_category": "Mapas",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "Halo game map",
+      "intent": "map",
+      "target_category": "Mapas",
+      "target_entity": "Halo"
+    },
+    {
+      "query": "Halo official promotional art",
+      "intent": "official_art",
+      "target_category": "Mapas",
+      "target_entity": "Halo"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "map",
+      "description": "Mapas map",
+      "queries": [
+        "GTA map",
+        "The Legend of Zelda map",
+        "Halo map"
+      ]
+    },
+    {
+      "kind": "official_art",
+      "description": "Mapas official_art",
+      "queries": [
+        "GTA official_art",
+        "The Legend of Zelda official_art",
+        "Halo official_art"
+      ]
+    }
+  ]
+}
