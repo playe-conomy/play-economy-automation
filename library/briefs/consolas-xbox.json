@@ -96,49 +96,49 @@
       "query": "Microsoft Xbox Series S console hardware",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series S"
+      "target_entity": "Xbox/Series S"
     },
     {
       "query": "Microsoft Xbox Series S controller accessories",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series S"
+      "target_entity": "Xbox/Series S"
     },
     {
       "query": "Microsoft Xbox Series S hardware accessories storage camera",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series S"
+      "target_entity": "Xbox/Series S"
     },
     {
       "query": "Microsoft Xbox Series S console product photo",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series S"
+      "target_entity": "Xbox/Series S"
     },
     {
       "query": "Microsoft Xbox Series X console hardware",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series X"
+      "target_entity": "Xbox/Series X"
     },
     {
       "query": "Microsoft Xbox Series X controller accessories",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series X"
+      "target_entity": "Xbox/Series X"
     },
     {
       "query": "Microsoft Xbox Series X hardware accessories storage camera",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series X"
+      "target_entity": "Xbox/Series X"
     },
     {
       "query": "Microsoft Xbox Series X console product photo",
       "intent": "console",
       "target_category": "Consolas",
-      "target_entity": "Xbox/Xbox Series X"
+      "target_entity": "Xbox/Series X"
     },
     {
       "query": "Xbox controller generations hardware",
