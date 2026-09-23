@@ -16,73 +16,73 @@
   },
   "visual_queries": [
     {
-      "query": "Mario character official art",
+      "query": "Super Mario Nintendo character artwork render",
       "intent": "character",
       "target_category": "Personajes",
       "target_entity": "Mario"
     },
     {
-      "query": "Mario official promotional art",
+      "query": "Super Mario Bros Mario Nintendo official character art",
       "intent": "official_art",
       "target_category": "Personajes",
       "target_entity": "Mario"
     },
     {
-      "query": "Link character official art",
+      "query": "The Legend of Zelda Link Nintendo character artwork render",
       "intent": "character",
       "target_category": "Personajes",
       "target_entity": "Link"
     },
     {
-      "query": "Link official promotional art",
+      "query": "Zelda Link Nintendo official character art",
       "intent": "official_art",
       "target_category": "Personajes",
       "target_entity": "Link"
     },
     {
-      "query": "Master Chief character official art",
+      "query": "Halo Master Chief character artwork render",
       "intent": "character",
       "target_category": "Personajes",
       "target_entity": "Master Chief"
     },
     {
-      "query": "Master Chief official promotional art",
+      "query": "Halo Master Chief official promotional character art",
       "intent": "official_art",
       "target_category": "Personajes",
       "target_entity": "Master Chief"
     },
     {
-      "query": "Leon S. Kennedy character official art",
+      "query": "Resident Evil Leon S. Kennedy character artwork render",
       "intent": "character",
       "target_category": "Personajes",
       "target_entity": "Leon S. Kennedy"
     },
     {
-      "query": "Leon S. Kennedy official promotional art",
+      "query": "Resident Evil Leon Kennedy official promotional character art",
       "intent": "official_art",
       "target_category": "Personajes",
       "target_entity": "Leon S. Kennedy"
     },
     {
-      "query": "CJ character official art",
+      "query": "GTA San Andreas CJ Carl Johnson character artwork",
       "intent": "character",
       "target_category": "Personajes",
       "target_entity": "CJ"
     },
     {
-      "query": "CJ official promotional art",
+      "query": "Grand Theft Auto San Andreas Carl Johnson official character art",
       "intent": "official_art",
       "target_category": "Personajes",
       "target_entity": "CJ"
     },
     {
-      "query": "Niko Bellic character official art",
+      "query": "GTA IV Niko Bellic character artwork render",
       "intent": "character",
       "target_category": "Personajes",
       "target_entity": "Niko Bellic"
     },
     {
-      "query": "Niko Bellic official promotional art",
+      "query": "Grand Theft Auto IV Niko Bellic official character art",
       "intent": "official_art",
       "target_category": "Personajes",
       "target_entity": "Niko Bellic"
