@@ -1,0 +1,177 @@
+{
+  "id": "library-empresas",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "Sony",
+      "Microsoft",
+      "Nintendo",
+      "EA",
+      "Activision",
+      "Ubisoft",
+      "Rockstar Games",
+      "Capcom",
+      "SEGA",
+      "Valve"
+    ],
+    "themes": [
+      "Empresas PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "Sony company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Sony"
+    },
+    {
+      "query": "Sony official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Sony"
+    },
+    {
+      "query": "Microsoft company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Microsoft"
+    },
+    {
+      "query": "Microsoft official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Microsoft"
+    },
+    {
+      "query": "Nintendo company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Nintendo"
+    },
+    {
+      "query": "Nintendo official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Nintendo"
+    },
+    {
+      "query": "EA company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "EA"
+    },
+    {
+      "query": "EA official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "EA"
+    },
+    {
+      "query": "Activision company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Activision"
+    },
+    {
+      "query": "Activision official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Activision"
+    },
+    {
+      "query": "Ubisoft company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Ubisoft"
+    },
+    {
+      "query": "Ubisoft official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Ubisoft"
+    },
+    {
+      "query": "Rockstar Games company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Rockstar Games"
+    },
+    {
+      "query": "Rockstar Games official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Rockstar Games"
+    },
+    {
+      "query": "Capcom company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Capcom"
+    },
+    {
+      "query": "Capcom official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Capcom"
+    },
+    {
+      "query": "SEGA company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "SEGA"
+    },
+    {
+      "query": "SEGA official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "SEGA"
+    },
+    {
+      "query": "Valve company logo headquarters",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Valve"
+    },
+    {
+      "query": "Valve official promotional art",
+      "intent": "official_art",
+      "target_category": "Empresas",
+      "target_entity": "Valve"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "company",
+      "description": "Empresas company",
+      "queries": [
+        "Sony company",
+        "Microsoft company",
+        "Nintendo company",
+        "EA company",
+        "Activision company",
+        "Ubisoft company",
+        "Rockstar Games company",
+        "Capcom company",
+        "SEGA company",
+        "Valve company"
+      ]
+    },
+    {
+      "kind": "official_art",
+      "description": "Empresas official_art",
+      "queries": [
+        "Sony official_art",
+        "Microsoft official_art",
+        "Nintendo official_art",
+        "EA official_art",
+        "Activision official_art",
+        "Ubisoft official_art",
+        "Rockstar Games official_art",
+        "Capcom official_art",
+        "SEGA official_art",
+        "Valve official_art"
+      ]
+    }
+  ]
+}
