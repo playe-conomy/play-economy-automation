@@ -1,0 +1,93 @@
+{
+  "id": "library-gameplay-core",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "GTA",
+      "Resident Evil",
+      "Guitar Hero",
+      "Prince of Persia",
+      "Halo",
+      "The Legend of Zelda",
+      "Mario",
+      "Burnout",
+      "Def Jam"
+    ],
+    "themes": [
+      "Gameplay PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "GTA gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "Resident Evil gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "Resident Evil"
+    },
+    {
+      "query": "Guitar Hero gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "Guitar Hero"
+    },
+    {
+      "query": "Prince of Persia gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "Prince of Persia"
+    },
+    {
+      "query": "Halo gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "Halo"
+    },
+    {
+      "query": "The Legend of Zelda gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "Mario gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "Mario"
+    },
+    {
+      "query": "Burnout gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "Burnout"
+    },
+    {
+      "query": "Def Jam gameplay screenshot",
+      "intent": "gameplay",
+      "target_category": "Gameplay",
+      "target_entity": "Def Jam"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "gameplay",
+      "description": "Gameplay gameplay",
+      "queries": [
+        "GTA gameplay",
+        "Resident Evil gameplay",
+        "Guitar Hero gameplay",
+        "Prince of Persia gameplay",
+        "Halo gameplay",
+        "The Legend of Zelda gameplay",
+        "Mario gameplay",
+        "Burnout gameplay",
+        "Def Jam gameplay"
+      ]
+    }
+  ]
+}
