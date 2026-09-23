@@ -14,7 +14,6 @@ export async function searchOpenverse(query, limits, request) {
   const url = new URL(API);
   url.searchParams.set("q", query.text);
   url.searchParams.set("page_size", String(limits.resultsPerQuery));
-  url.searchParams.set("license_type", "commercial");
   const payload = await request(url, limits, "Openverse");
   return (payload.results ?? []).map((item) => ({
     provider: "openverse",
