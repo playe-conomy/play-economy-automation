@@ -25,6 +25,30 @@ const createRequest = requests.find((request) => request.options.method === "POS
 assert.ok(createRequest, "creates a missing entity folder");
 assert.deepEqual(JSON.parse(createRequest.options.body).parents, ["technology-id"]);
 
+const nestedCreates = [];
+const nestedFolder = await resolveDriveFolder(
+  { finalCategory: "Consolas", finalEntity: "PlayStation/PS2" },
+  {
+    accessToken: "test-token",
+    rootFolderId: rootId,
+    fetchImpl: async (url, options = {}) => {
+      const decoded = decodeURIComponent(String(url));
+      if (decoded.includes("name = 'Consolas'")) return json({ files: [{ id: "consolas-id", name: "Consolas", mimeType: folderMimeType }] });
+      if (decoded.includes("name = 'PlayStation'")) return json({ files: [{ id: "playstation-id", name: "PlayStation", mimeType: folderMimeType }] });
+      if (decoded.includes("name = 'PS2'")) return json({ files: [] });
+      if (options.method === "POST") {
+        nestedCreates.push(JSON.parse(options.body));
+        return json({ id: "ps2-id", name: "PS2", mimeType: folderMimeType });
+      }
+      return json({ files: [] });
+    }
+  }
+);
+assert.deepEqual(nestedFolder, { id: "ps2-id", path: "02_Biblioteca Visual/Consolas/PlayStation/PS2/" });
+assert.equal(nestedCreates.length, 1);
+assert.deepEqual(nestedCreates[0].parents, ["playstation-id"]);
+assert.equal(nestedCreates[0].name, "PS2");
+
 let writesAfterBadRoot = 0;
 await assert.rejects(
   verifyDriveRoot({
