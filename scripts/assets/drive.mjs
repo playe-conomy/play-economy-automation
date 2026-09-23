@@ -19,6 +19,7 @@ export function driveDestination(candidate) {
 
 export function resolveAssetDestination(assetRole, metadata = {}) {
   const entity = metadata.entity ?? metadata.franchise ?? metadata.company ?? metadata.console ?? null;
+  const requestedCategory = metadata.targetCategory ?? metadata.target_category ?? null;
   const folders = {
     specific: "Franquicias",
     cover_art: "Franquicias",
@@ -29,6 +30,11 @@ export function resolveAssetDestination(assetRole, metadata = {}) {
     official_art: "Arte Oficial",
     map: "Mapas"
   };
+  if (requestedCategory) {
+    const finalEntity = entity || null;
+    const suffix = finalEntity ? `${finalEntity}/` : "";
+    return { finalCategory: requestedCategory, finalEntity, drivePath: `02_Biblioteca Visual/${requestedCategory}/${suffix}` };
+  }
   if (assetRole === "official_art" && entity) {
     return { finalCategory: "Franquicias", finalEntity: entity, drivePath: `02_Biblioteca Visual/Franquicias/${entity}/` };
   }
