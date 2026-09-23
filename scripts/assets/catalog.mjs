@@ -269,6 +269,28 @@ function queryRequirement(entry) {
   return null;
 }
 
+const DEFAULT_EDITORIAL_FORMS = Object.freeze({
+  gameplay: "screenshot",
+  controller: "product",
+  specific: "product",
+  cover_art: "clean_art",
+  official_art: "clean_art",
+  company: "logo",
+  contextual_broll: "contextual"
+});
+
+export function normalizeVisualQuery(entry) {
+  const query = entry && typeof entry === "object" ? entry : { query: entry };
+  const intent = query.intent ?? "specific";
+  return {
+    ...query,
+    intent,
+    preferred_editorial_form: Object.hasOwn(query, "preferred_editorial_form")
+      ? query.preferred_editorial_form
+      : DEFAULT_EDITORIAL_FORMS[intent] ?? null
+  };
+}
+
 export function deriveCoverageRequirements(content) {
   const requirements = [];
   for (const scene of content.scenes ?? []) {

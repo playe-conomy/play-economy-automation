@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
-import { allowedLicense, classifyAsset, inspectMetadata, qualityTier, scoreCandidate, semanticRelevance } from "./catalog.mjs";
+import { allowedLicense, classifyAsset, inspectMetadata, normalizeVisualQuery, qualityTier, scoreCandidate, semanticRelevance } from "./catalog.mjs";
 import { resolveAssetDestination } from "./drive.mjs";
 
 const specificQuery = { text: "Guitar Hero controller", intent: "specific", target_entity: "Guitar Hero", target_category: "Franquicias" };
 const brollQuery = { text: "electric guitar concert", intent: "contextual_broll", target_entity: null, target_category: "Tecnología" };
+
+for (const [intent, preferredEditorialForm] of Object.entries({
+  gameplay: "screenshot",
+  controller: "product",
+  specific: "product",
+  cover_art: "clean_art",
+  official_art: "clean_art",
+  company: "logo",
+  contextual_broll: "contextual"
+})) {
+  assert.equal(normalizeVisualQuery({ query: "test", intent }).preferred_editorial_form, preferredEditorialForm, `${intent} receives its deterministic editorial form`);
+}
+assert.equal(normalizeVisualQuery({ query: "test", intent: "gameplay", preferred_editorial_form: "clean_art" }).preferred_editorial_form, "clean_art", "an explicit editorial form is never overwritten");
 
 const controller = {
   title: "Guitar Hero controller", tags: ["Guitar Hero", "controller"], provider: "test",

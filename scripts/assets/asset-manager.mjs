@@ -1,6 +1,6 @@
 import { mkdirSync, promises as fs } from "node:fs";
 import { basename, resolve } from "node:path";
-import { assetRecord, attributionLines, classifyRights, coverageGaps, deriveCoverageRequirements, findDuplicate, inspectMetadata, loadManifest, planEditorialQueries, saveManifest, scoreCandidate } from "./catalog.mjs";
+import { assetRecord, attributionLines, classifyRights, coverageGaps, deriveCoverageRequirements, findDuplicate, inspectMetadata, loadManifest, normalizeVisualQuery, planEditorialQueries, saveManifest, scoreCandidate } from "./catalog.mjs";
 import { driveAuthenticatedIdentity, driveConfiguration, resolveAssetDestination, uploadToDrive, verifyDriveRoot } from "./drive.mjs";
 import { hydrateDriveCatalog, persistDriveCatalog, persistBootstrapOnly, prepareBootstrapOnly } from "./drive-catalog.mjs";
 import { artifactCachePath, downloadCandidate, shouldDownload } from "./download.mjs";
@@ -160,15 +160,18 @@ function queriesFromContent() {
   // Library briefs declare their searches explicitly. Preserve those queries instead
   // of converting them through the scene/video coverage planner.
   if (Array.isArray(content.visual_queries) && content.visual_queries.length) {
-    const planned = content.visual_queries.slice(0, Math.max(0, limits.maxQueries)).map((entry) => ({
-      text: entry.query,
-      primary: entry.query,
-      intent: entry.intent ?? "specific",
-      asset_role: entry.intent ?? "specific",
-      target_entity: entry.target_entity ?? null,
-      target_category: entry.target_category ?? null,
-      preferred_editorial_form: entry.preferred_editorial_form ?? null
-    }));
+    const planned = content.visual_queries.slice(0, Math.max(0, limits.maxQueries)).map((entry) => {
+      const normalized = normalizeVisualQuery(entry);
+      return {
+        text: normalized.query,
+        primary: normalized.query,
+        intent: normalized.intent,
+        asset_role: normalized.intent,
+        target_entity: normalized.target_entity ?? null,
+        target_category: normalized.target_category ?? null,
+        preferred_editorial_form: normalized.preferred_editorial_form
+      };
+    });
     report.coverage.requirements = planned.map((query) => ({
       entity: query.target_entity,
       asset_role: query.asset_role,
