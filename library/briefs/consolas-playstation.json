@@ -2,23 +2,213 @@
   "id": "library-consoles-playstation",
   "scenes": [],
   "entities": {
-    "consoles": ["PlayStation","PS1","PlayStation 2","PS2","PlayStation 3","PS3","PlayStation 4","PS4","PlayStation 5","PS5","PS5 Pro"],
-    "companies": ["Sony","Sony Interactive Entertainment"],
-    "themes": ["PlayStation hardware","PlayStation console history","PlayStation controllers"]
+    "consoles": [
+      "PlayStation",
+      "PS1",
+      "PlayStation 2",
+      "PS2",
+      "PlayStation 3",
+      "PS3",
+      "PlayStation 4",
+      "PS4",
+      "PlayStation 5",
+      "PS5",
+      "PS5 Pro"
+    ],
+    "companies": [
+      "Sony",
+      "Sony Interactive Entertainment"
+    ],
+    "themes": [
+      "PlayStation hardware",
+      "PlayStation console history",
+      "PlayStation controllers"
+    ]
   },
   "visual_queries": [
-    {"query":"Sony PlayStation PS1 console official","intent":"console","target_category":"Consolas","target_entity":"PlayStation/PS1"},
-    {"query":"Sony PlayStation 2 PS2 console official","intent":"console","target_category":"Consolas","target_entity":"PlayStation/PS2"},
-    {"query":"Sony PlayStation 3 PS3 console official","intent":"console","target_category":"Consolas","target_entity":"PlayStation/PS3"},
-    {"query":"Sony PlayStation 4 PS4 console official","intent":"console","target_category":"Consolas","target_entity":"PlayStation/PS4"},
-    {"query":"Sony PlayStation 5 PS5 console official","intent":"console","target_category":"Consolas","target_entity":"PlayStation/PS5"},
-    {"query":"Sony PlayStation 5 Pro PS5 Pro console official","intent":"console","target_category":"Consolas","target_entity":"PlayStation/PS5 Pro"},
-    {"query":"PlayStation controller generations official","intent":"specific","target_category":"Consolas","target_entity":"PlayStation"},
-    {"query":"Sony Interactive Entertainment PlayStation logo official","intent":"company","target_category":"Empresas","target_entity":"Sony"}
+    {
+      "query": "Sony PlayStation PS1 console hardware",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS1"
+    },
+    {
+      "query": "Sony PlayStation PS1 controller accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS1"
+    },
+    {
+      "query": "Sony PlayStation PS1 hardware accessories memory card camera",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS1"
+    },
+    {
+      "query": "Sony PlayStation PS1 console product photo",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS1"
+    },
+    {
+      "query": "Sony PlayStation 2 PS2 console hardware",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS2"
+    },
+    {
+      "query": "Sony PlayStation 2 PS2 controller accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS2"
+    },
+    {
+      "query": "Sony PlayStation 2 PS2 hardware accessories memory card camera",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS2"
+    },
+    {
+      "query": "Sony PlayStation 2 PS2 console product photo",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS2"
+    },
+    {
+      "query": "Sony PlayStation 3 PS3 console hardware",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS3"
+    },
+    {
+      "query": "Sony PlayStation 3 PS3 controller accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS3"
+    },
+    {
+      "query": "Sony PlayStation 3 PS3 hardware accessories memory card camera",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS3"
+    },
+    {
+      "query": "Sony PlayStation 3 PS3 console product photo",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS3"
+    },
+    {
+      "query": "Sony PlayStation 4 PS4 console hardware",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS4"
+    },
+    {
+      "query": "Sony PlayStation 4 PS4 controller accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS4"
+    },
+    {
+      "query": "Sony PlayStation 4 PS4 hardware accessories memory card camera",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS4"
+    },
+    {
+      "query": "Sony PlayStation 4 PS4 console product photo",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS4"
+    },
+    {
+      "query": "Sony PlayStation 5 PS5 console hardware",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5"
+    },
+    {
+      "query": "Sony PlayStation 5 PS5 controller accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5"
+    },
+    {
+      "query": "Sony PlayStation 5 PS5 hardware accessories memory card camera",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5"
+    },
+    {
+      "query": "Sony PlayStation 5 PS5 console product photo",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5"
+    },
+    {
+      "query": "Sony PlayStation 5 Pro PS5 Pro console hardware",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5 Pro"
+    },
+    {
+      "query": "Sony PlayStation 5 Pro PS5 Pro controller accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5 Pro"
+    },
+    {
+      "query": "Sony PlayStation 5 Pro PS5 Pro hardware accessories memory card camera",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5 Pro"
+    },
+    {
+      "query": "Sony PlayStation 5 Pro PS5 Pro console product photo",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation/PS5 Pro"
+    },
+    {
+      "query": "PlayStation controller generations hardware",
+      "intent": "specific",
+      "target_category": "Consolas",
+      "target_entity": "PlayStation"
+    },
+    {
+      "query": "Sony Interactive Entertainment PlayStation logo",
+      "intent": "company",
+      "target_category": "Empresas",
+      "target_entity": "Sony"
+    }
   ],
   "asset_requirements": [
-    {"kind":"console","description":"PlayStation console generations","queries":["PlayStation PS1 console","PlayStation 2 PS2 console","PlayStation 3 PS3 console","PlayStation 4 PS4 console","PlayStation 5 PS5 console","PlayStation 5 Pro console"]},
-    {"kind":"specific","description":"PlayStation controllers and hardware context","queries":["PlayStation controller generations"]},
-    {"kind":"company","description":"Sony PlayStation corporate context","queries":["Sony Interactive Entertainment PlayStation logo"]}
+    {
+      "kind": "console",
+      "description": "PlayStation console generations",
+      "queries": [
+        "PlayStation PS1 console",
+        "PlayStation 2 PS2 console",
+        "PlayStation 3 PS3 console",
+        "PlayStation 4 PS4 console",
+        "PlayStation 5 PS5 console",
+        "PlayStation 5 Pro console"
+      ]
+    },
+    {
+      "kind": "specific",
+      "description": "PlayStation controllers and hardware context",
+      "queries": [
+        "PlayStation controller generations"
+      ]
+    },
+    {
+      "kind": "company",
+      "description": "Sony PlayStation corporate context",
+      "queries": [
+        "Sony Interactive Entertainment PlayStation logo"
+      ]
+    }
   ]
 }
