@@ -341,7 +341,7 @@ for (const query of queries) {
         const duplicate = findDuplicate(manifest, candidate);
         const destinationRole = query.intent ?? scored.classification.role;
         const destinationEntity = query.target_entity ?? scored.classification.entity;
-        const destination = resolveAssetDestination(destinationRole, { entity: destinationEntity });
+        const destination = resolveAssetDestination(destinationRole, { entity: destinationEntity, targetCategory: query.target_category });
         const rejectionReasons = [];
         if (duplicate) rejectionReasons.push("duplicate");
         if (!candidate.sourceUrl || !candidate.downloadUrl) rejectionReasons.push("invalid_url");
