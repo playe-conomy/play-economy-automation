@@ -15,7 +15,7 @@
     "preferVertical": false
   },
   "rights": {
-    "copyrighted_editorial_enabled": true,
+    "copyrighted_editorial_enabled": false,
     "official_source_registry": [
       {
         "id": "activision-games-blog-guitar-hero-live",
