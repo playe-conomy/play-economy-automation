@@ -331,7 +331,8 @@ for (const query of queries) {
         const rights = classifyRights(candidate, {
           copyrightedEditorialEnabled: rightsConfig.copyrighted_editorial_enabled === true,
           allowCopyrightedEditorial,
-          officialSourceRegistry: rightsConfig.official_source_registry ?? []
+          officialSourceRegistry: rightsConfig.official_source_registry ?? [],
+          acceptUnknownOrRestrictedLicenses: rightsConfig.accept_unknown_or_restricted_licenses === true
         });
         const scored = scoreCandidate(candidate, query, { rights });
         const metadata = inspectMetadata(candidate, { rights });
@@ -342,7 +343,8 @@ for (const query of queries) {
         const rejectionReasons = [];
         if (duplicate) rejectionReasons.push("duplicate");
         if (!candidate.sourceUrl || !candidate.downloadUrl) rejectionReasons.push("invalid_url");
-        if (metadata.missingFields.length) rejectionReasons.push("missing_metadata");
+        const blockingMetadata = rightsConfig.relaxed_library_mode === true ? metadata.missingFields.filter((field) => !["license", "license_url", "creator", "attribution"].includes(field)) : metadata.missingFields;
+        if (blockingMetadata.length) rejectionReasons.push("missing_metadata");
         if (!rights.accepted) rejectionReasons.push(rights.reason);
         if (scored.quality.tier === "low_resolution" || scored.quality.tier === "reject") rejectionReasons.push("insufficient_resolution");
         if (!String(candidate.mimeType ?? "").startsWith("image/")) rejectionReasons.push("unsupported_mime");
@@ -352,7 +354,7 @@ for (const query of queries) {
           stats.rejected += 1;
           if (duplicate) report.duplicates += 1;
           rejectionReasons.forEach((reason) => report.rejection_summary[reason] = (report.rejection_summary[reason] ?? 0) + 1);
-          report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, role: scored.classification.role, editorial_form: scored.editorialForm, target_entity: query.target_entity ?? null, resolved_destination: destination, rights, semantic_relevance: scored.semantic, rejection_reasons: [...new Set(rejectionReasons)], missing_fields: metadata.missingFields, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, visual_utility: scored.visualUtility, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, license_url: candidate.licenseUrl, width: candidate.width, height: candidate.height } });
+          report.rejected_candidates.push({ provider: provider.name, query: query.text, query_intent: query.intent, role: scored.classification.role, editorial_form: scored.editorialForm, target_entity: query.target_entity ?? null, resolved_destination: destination, rights, semantic_relevance: scored.semantic, rejection_reasons: [...new Set(rejectionReasons)], missing_fields: blockingMetadata, metadata_warnings: metadata.warnings, quality_tier: scored.quality.tier, visual_utility: scored.visualUtility, score_breakdown: scored.scoreBreakdown, total_score: scored.score, asset: { title: candidate.title, source_url: candidate.sourceUrl, license: candidate.license, license_url: candidate.licenseUrl, width: candidate.width, height: candidate.height } });
           continue;
         }
         candidate.assetRole = query.intent ?? scored.classification.role;
