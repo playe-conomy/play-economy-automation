@@ -168,7 +168,8 @@ function entityAliases(value = "") {
   };
   const direct = aliases[normalized] ?? [];
   const tail = normalized.includes("/") ? normalizeText(normalized.split("/").pop()) : "";
-  return [...new Set([normalized, tail, ...direct].filter(Boolean))];
+  const ambiguousCharacter = ["mario", "link", "cj"].includes(normalized);
+  return [...new Set([...(ambiguousCharacter ? [] : [normalized]), tail, ...direct].filter(Boolean))];
 }
 
 function matchesEntity(text, value) {
