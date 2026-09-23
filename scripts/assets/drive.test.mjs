@@ -121,4 +121,14 @@ try {
   await rm(cacheDir, { recursive: true, force: true });
 }
 
+
+assert.deepEqual(
+  (await import("./drive.mjs")).resolveAssetDestination("official_art", { entity: "Mario", targetCategory: "Personajes" }),
+  { finalCategory: "Personajes", finalEntity: "Mario", drivePath: "02_Biblioteca Visual/Personajes/Mario/" }
+);
+assert.deepEqual(
+  (await import("./drive.mjs")).resolveAssetDestination("technology", { entity: "Nintendo/GameCube", targetCategory: "Consolas" }),
+  { finalCategory: "Consolas", finalEntity: "Nintendo/GameCube", drivePath: "02_Biblioteca Visual/Consolas/Nintendo/GameCube/" }
+);
+
 console.log("drive tests passed");
