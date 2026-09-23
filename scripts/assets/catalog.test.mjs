@@ -86,3 +86,32 @@ assert.equal(qualityTier(wideHighQuality).tier, "high_quality");
 assert.ok(scoreCandidate(wideHighQuality, specificQuery).score > scoreCandidate(verticalUsable, specificQuery).score);
 
 console.log("catalog tests passed");
+
+const ps1Query = { text: "PS1 console controller hardware accessories", intent: "console", target_entity: "PlayStation/PS1", target_category: "Consolas" };
+const wrongPs2 = { ...controller, title: "Sony PlayStation 2 PS2 console", description: "PlayStation 2 hardware" };
+const wrongPs2Semantic = semanticRelevance(wrongPs2, ps1Query);
+assert.equal(wrongPs2Semantic.passed, false);
+assert.ok(wrongPs2Semantic.reasons.includes("conflicting_entity_detected"));
+
+const gameCubeQuery = { text: "GameCube console controller hardware accessories", intent: "console", target_entity: "Nintendo/GameCube", target_category: "Consolas" };
+const wrongGameCube = { ...controller, title: "PlayStation 2 console", description: "PS2 gaming hardware GameCube comparison" };
+const wrongGameCubeSemantic = semanticRelevance(wrongGameCube, gameCubeQuery);
+assert.equal(wrongGameCubeSemantic.passed, false);
+assert.ok(wrongGameCubeSemantic.reasons.includes("conflicting_entity_detected"));
+
+const marioCharacterQuery = { text: "Mario character official art", intent: "character", target_entity: "Mario", target_category: "Personajes" };
+const unrelatedMarioPerson = { ...controller, title: "Giovanni Mario portrait", description: "Italian photographer portrait" };
+const unrelatedMarioSemantic = semanticRelevance(unrelatedMarioPerson, marioCharacterQuery);
+assert.equal(unrelatedMarioSemantic.passed, false);
+
+const realMarioCharacter = { ...controller, title: "Super Mario character artwork", description: "Nintendo game character" };
+assert.equal(semanticRelevance(realMarioCharacter, marioCharacterQuery).passed, true);
+
+const zeldaMapQuery = { text: "The Legend of Zelda game map", intent: "map", target_entity: "The Legend of Zelda", target_category: "Mapas" };
+const zeldaCosplay = { ...controller, title: "The Legend of Zelda cosplay", description: "Link cosplay convention photo" };
+const zeldaCosplaySemantic = semanticRelevance(zeldaCosplay, zeldaMapQuery);
+assert.equal(zeldaCosplaySemantic.passed, false);
+assert.ok(zeldaCosplaySemantic.reasons.includes("intent_evidence_missing"));
+
+const zeldaMap = { ...controller, title: "The Legend of Zelda world map", description: "game overworld map" };
+assert.equal(semanticRelevance(zeldaMap, zeldaMapQuery).passed, true);
