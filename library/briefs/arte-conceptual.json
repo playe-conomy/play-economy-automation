@@ -1,0 +1,147 @@
+{
+  "id": "library-arte-conceptual",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "PlayStation",
+      "Xbox",
+      "Nintendo",
+      "GTA",
+      "Resident Evil",
+      "Halo",
+      "The Legend of Zelda",
+      "Mario"
+    ],
+    "themes": [
+      "Concept Art PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "PlayStation official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "PlayStation"
+    },
+    {
+      "query": "PlayStation video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "PlayStation"
+    },
+    {
+      "query": "Xbox official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "Xbox"
+    },
+    {
+      "query": "Xbox video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "Xbox"
+    },
+    {
+      "query": "Nintendo official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "Nintendo"
+    },
+    {
+      "query": "Nintendo video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "Nintendo"
+    },
+    {
+      "query": "GTA official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "GTA video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "Resident Evil official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "Resident Evil"
+    },
+    {
+      "query": "Resident Evil video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "Resident Evil"
+    },
+    {
+      "query": "Halo official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "Halo"
+    },
+    {
+      "query": "Halo video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "Halo"
+    },
+    {
+      "query": "The Legend of Zelda official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "The Legend of Zelda video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "Mario official promotional art",
+      "intent": "official_art",
+      "target_category": "Concept Art",
+      "target_entity": "Mario"
+    },
+    {
+      "query": "Mario video game",
+      "intent": "specific",
+      "target_category": "Concept Art",
+      "target_entity": "Mario"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "official_art",
+      "description": "Concept Art official_art",
+      "queries": [
+        "PlayStation official_art",
+        "Xbox official_art",
+        "Nintendo official_art",
+        "GTA official_art",
+        "Resident Evil official_art",
+        "Halo official_art",
+        "The Legend of Zelda official_art",
+        "Mario official_art"
+      ]
+    },
+    {
+      "kind": "specific",
+      "description": "Concept Art specific",
+      "queries": [
+        "PlayStation specific",
+        "Xbox specific",
+        "Nintendo specific",
+        "GTA specific",
+        "Resident Evil specific",
+        "Halo specific",
+        "The Legend of Zelda specific",
+        "Mario specific"
+      ]
+    }
+  ]
+}
