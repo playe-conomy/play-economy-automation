@@ -3,8 +3,16 @@ name: PlayEconomy Library Builder
 on:
   workflow_dispatch:
     inputs:
+      run_mode:
+        description: Run the full master plan or a single brief
+        required: true
+        type: choice
+        options:
+          - full_plan
+          - single_brief
+        default: full_plan
       content_file:
-        description: Asset brief used only to populate the reusable library
+        description: Brief used only when run_mode is single_brief
         required: true
         default: library/briefs/consolas-xbox.json
       max_downloads:
@@ -33,7 +41,7 @@ jobs:
   build-library:
     name: Populate reusable asset library
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 90
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -89,9 +97,62 @@ jobs:
           printf 'ASSET_MANAGER_CONFIG_PATH=%s\n' "$library_config" >> "$GITHUB_ENV"
 
       - name: Populate library
+        env:
+          RUN_MODE: ${{ inputs.run_mode }}
+          CONTENT_FILE: ${{ inputs.content_file }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          MAX_DOWNLOADS: ${{ inputs.max_downloads }}
+          ENABLE_EDITORIAL: ${{ inputs.enable_editorial_sources }}
         run: |
           set -euo pipefail
-          node scripts/assets/asset-manager.mjs             --config "$ASSET_MANAGER_CONFIG_PATH"             --content "${{ inputs.content_file }}"             --dry-run "${{ inputs.dry_run }}"             --max-downloads "${{ inputs.max_downloads }}"             --allow-copyrighted-editorial "${{ inputs.enable_editorial_sources }}"             --report asset-manager/reports/library-builder-latest.json
+          mkdir -p asset-manager/reports/library-builder
+          if [[ "$RUN_MODE" == "full_plan" ]]; then
+            mapfile -t briefs < <(node -e '
+              const p=require("./library/library-plan.json");
+              for (const b of p.batches) {
+                if (!b.brief) throw new Error("Missing brief for "+b.id);
+                console.log(b.brief);
+              }
+            ')
+          else
+            briefs=("$CONTENT_FILE")
+          fi
+
+          : > asset-manager/reports/library-builder-summary.ndjson
+          failures=0
+          for brief in "${briefs[@]}"; do
+            batch="$(basename "$brief" .json)"
+            report="asset-manager/reports/library-builder/${batch}.json"
+            echo "::group::Library batch: $batch"
+            if node scripts/assets/asset-manager.mjs \
+              --config "$ASSET_MANAGER_CONFIG_PATH" \
+              --content "$brief" \
+              --dry-run "$DRY_RUN" \
+              --max-downloads "$MAX_DOWNLOADS" \
+              --allow-copyrighted-editorial "$ENABLE_EDITORIAL" \
+              --report "$report"; then
+              printf '{"batch":"%s","brief":"%s","status":"success","report":"%s"}\n' "$batch" "$brief" "$report" >> asset-manager/reports/library-builder-summary.ndjson
+            else
+              failures=$((failures+1))
+              printf '{"batch":"%s","brief":"%s","status":"failed","report":"%s"}\n' "$batch" "$brief" "$report" >> asset-manager/reports/library-builder-summary.ndjson
+            fi
+            echo "::endgroup::"
+          done
+
+          node -e '
+            const fs=require("fs");
+            const rows=fs.readFileSync("asset-manager/reports/library-builder-summary.ndjson","utf8").trim().split(/\n+/).filter(Boolean).map(JSON.parse);
+            fs.writeFileSync("asset-manager/reports/library-builder-summary.json", JSON.stringify({
+              generated_at:new Date().toISOString(),
+              mode:process.env.RUN_MODE,
+              batches:rows,
+              totals:{batches:rows.length,success:rows.filter(x=>x.status==="success").length,failed:rows.filter(x=>x.status==="failed").length}
+            },null,2)+"\n");
+          '
+          if (( failures > 0 )); then
+            echo "::error::$failures library batch(es) failed"
+            exit 1
+          fi
 
       - name: Upload library report
         if: always()
@@ -99,7 +160,8 @@ jobs:
         with:
           name: playeconomy-library-builder-report
           path: |
-            asset-manager/reports/library-builder-latest.json
+            asset-manager/reports/library-builder/
+            asset-manager/reports/library-builder-summary.json
             asset-manager/manifest.json
           if-no-files-found: warn
           retention-days: 7
