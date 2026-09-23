@@ -89,7 +89,7 @@ function configuredRegistryEntry(candidate, registry = []) {
   return entry;
 }
 
-export function classifyRights(candidate, { copyrightedEditorialEnabled = false, allowCopyrightedEditorial = false, officialSourceRegistry = [] } = {}) {
+export function classifyRights(candidate, { copyrightedEditorialEnabled = false, allowCopyrightedEditorial = false, officialSourceRegistry = [], acceptUnknownOrRestrictedLicenses = false } = {}) {
   const requested = candidate.rights_class ?? candidate.rightsClass ?? null;
   if (requested === RIGHTS_CLASSES.COPYRIGHTED_EDITORIAL) {
     const provenancePageUrl = candidate.provenance_page_url ?? candidate.provenancePageUrl;
@@ -111,10 +111,11 @@ export function classifyRights(candidate, { copyrightedEditorialEnabled = false,
   }
   const license = allowedLicense(candidate);
   if (requested === RIGHTS_CLASSES.OPEN_LICENSE || !requested) {
-    return license.allowed
-      ? { accepted: true, rightsClass: RIGHTS_CLASSES.OPEN_LICENSE, reason: "reusable_license", provenanceConfidence: 80 }
-      : { accepted: false, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: license.reason, provenanceConfidence: 0 };
+    if (license.allowed) return { accepted: true, rightsClass: RIGHTS_CLASSES.OPEN_LICENSE, reason: "reusable_license", provenanceConfidence: 80 };
+    if (acceptUnknownOrRestrictedLicenses) return { accepted: true, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: "accepted_in_relaxed_library_mode", provenanceConfidence: 20 };
+    return { accepted: false, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: license.reason, provenanceConfidence: 0 };
   }
+  if (acceptUnknownOrRestrictedLicenses) return { accepted: true, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: "accepted_in_relaxed_library_mode", provenanceConfidence: 20 };
   return { accepted: false, rightsClass: RIGHTS_CLASSES.REJECTED_OR_UNKNOWN, reason: "rights_class_rejected_or_unknown", provenanceConfidence: 0 };
 }
 
