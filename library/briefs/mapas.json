@@ -13,38 +13,38 @@
   },
   "visual_queries": [
     {
-      "query": "GTA game map",
+      "query": "Grand Theft Auto GTA world map city map",
       "intent": "map",
       "target_category": "Mapas",
       "target_entity": "GTA"
     },
     {
-      "query": "GTA official promotional art",
-      "intent": "official_art",
+      "query": "GTA San Andreas Vice City game map",
+      "intent": "map",
       "target_category": "Mapas",
       "target_entity": "GTA"
     },
     {
-      "query": "The Legend of Zelda game map",
+      "query": "The Legend of Zelda Hyrule world map overworld",
       "intent": "map",
       "target_category": "Mapas",
       "target_entity": "The Legend of Zelda"
     },
     {
-      "query": "The Legend of Zelda official promotional art",
-      "intent": "official_art",
+      "query": "Zelda game map Hyrule region map",
+      "intent": "map",
       "target_category": "Mapas",
       "target_entity": "The Legend of Zelda"
     },
     {
-      "query": "Halo game map",
+      "query": "Halo multiplayer map game level map",
       "intent": "map",
       "target_category": "Mapas",
       "target_entity": "Halo"
     },
     {
-      "query": "Halo official promotional art",
-      "intent": "official_art",
+      "query": "Halo campaign world game map",
+      "intent": "map",
       "target_category": "Mapas",
       "target_entity": "Halo"
     }
