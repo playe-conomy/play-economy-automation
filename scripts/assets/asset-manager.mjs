@@ -407,7 +407,7 @@ for (const selected of selection.selected) {
   } else if (shouldDownload(dryRun)) {
     report.downloads.attempted += 1;
     const outcome = await downloadCandidate({ ...candidate, id: record.id }, { cacheDir: resolve(artifactCachePath()), maxFileBytes: limits.maxFileBytes, httpTimeoutMs: limits.httpTimeoutMs, maxRetries: limits.maxRetries, backoffMs: limits.backoffMs, manifestAssets: manifest.assets, executionChecksums });
-    Object.assign(proposal, { download_status: outcome.status, download_error: outcome.download_error, checksum: outcome.checksum, local_cache_path: outcome.local_cache_path, bytes: outcome.bytes });
+    Object.assign(proposal, { download_status: outcome.status, download_error: outcome.download_error, download_diagnostics: outcome.download_diagnostics, checksum: outcome.checksum, local_cache_path: outcome.local_cache_path, bytes: outcome.bytes });
     if (outcome.status === "downloaded") {
       report.downloads.successful += 1;
       Object.assign(record, { filename: outcome.filename, mime_type: outcome.mime_type, checksum: outcome.checksum, local_cache_path: outcome.local_cache_path, download_date: new Date().toISOString(), reusable: true, status: "downloaded" });

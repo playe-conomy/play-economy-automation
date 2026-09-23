@@ -42,6 +42,16 @@ function isExactApprovedStaticAsset(asset, index) {
   return expected && Object.entries(expected).every(([key, value]) => asset?.[key] === value);
 }
 
+export function isExactApprovedActivisionEditorialJpeg(candidate) {
+  return APPROVED_STATIC_ASSETS.some((asset) =>
+    candidate?.provider === "activision-games-blog" &&
+    candidate?.source_type === "activision_games_blog_article" &&
+    candidate?.mimeType === asset.mime_type &&
+    candidate?.sourceUrl === asset.asset_url &&
+    candidate?.downloadUrl === asset.asset_url
+  );
+}
+
 function validRegistryEntry(entry) {
   return entry?.approved === true && entry.domains?.includes(ARTICLE_HOST) && entry.cdn_domains?.includes(ARTICLE_HOST) &&
     entry.source_types?.includes("activision_games_blog_article") && Array.isArray(entry.approved_static_assets) &&
