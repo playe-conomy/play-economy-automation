@@ -1,0 +1,117 @@
+{
+  "id": "library-tecnologia",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "GPU",
+      "CPU",
+      "RAM",
+      "SSD",
+      "semiconductors",
+      "ray tracing"
+    ],
+    "themes": [
+      "Tecnología PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "GPU gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Tecnología",
+      "target_entity": "GPU"
+    },
+    {
+      "query": "GPU technology hardware",
+      "intent": "contextual_broll",
+      "target_category": "Tecnología",
+      "target_entity": "GPU"
+    },
+    {
+      "query": "CPU gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Tecnología",
+      "target_entity": "CPU"
+    },
+    {
+      "query": "CPU technology hardware",
+      "intent": "contextual_broll",
+      "target_category": "Tecnología",
+      "target_entity": "CPU"
+    },
+    {
+      "query": "RAM gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Tecnología",
+      "target_entity": "RAM"
+    },
+    {
+      "query": "RAM technology hardware",
+      "intent": "contextual_broll",
+      "target_category": "Tecnología",
+      "target_entity": "RAM"
+    },
+    {
+      "query": "SSD gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Tecnología",
+      "target_entity": "SSD"
+    },
+    {
+      "query": "SSD technology hardware",
+      "intent": "contextual_broll",
+      "target_category": "Tecnología",
+      "target_entity": "SSD"
+    },
+    {
+      "query": "semiconductors gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Tecnología",
+      "target_entity": "semiconductors"
+    },
+    {
+      "query": "semiconductors technology hardware",
+      "intent": "contextual_broll",
+      "target_category": "Tecnología",
+      "target_entity": "semiconductors"
+    },
+    {
+      "query": "ray tracing gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Tecnología",
+      "target_entity": "ray tracing"
+    },
+    {
+      "query": "ray tracing technology hardware",
+      "intent": "contextual_broll",
+      "target_category": "Tecnología",
+      "target_entity": "ray tracing"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "technology",
+      "description": "Tecnología technology",
+      "queries": [
+        "GPU technology",
+        "CPU technology",
+        "RAM technology",
+        "SSD technology",
+        "semiconductors technology",
+        "ray tracing technology"
+      ]
+    },
+    {
+      "kind": "contextual_broll",
+      "description": "Tecnología contextual_broll",
+      "queries": [
+        "GPU contextual_broll",
+        "CPU contextual_broll",
+        "RAM contextual_broll",
+        "SSD contextual_broll",
+        "semiconductors contextual_broll",
+        "ray tracing contextual_broll"
+      ]
+    }
+  ]
+}
