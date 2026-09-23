@@ -1,0 +1,209 @@
+{
+  "id": "library-consolas-nintendo",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "NES",
+      "SNES",
+      "Nintendo 64",
+      "GameCube",
+      "Wii",
+      "Wii U",
+      "Nintendo Switch",
+      "Nintendo Switch 2"
+    ],
+    "themes": [
+      "Consolas PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "NES console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/NES"
+    },
+    {
+      "query": "NES official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/NES"
+    },
+    {
+      "query": "NES gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/NES"
+    },
+    {
+      "query": "SNES console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/SNES"
+    },
+    {
+      "query": "SNES official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/SNES"
+    },
+    {
+      "query": "SNES gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/SNES"
+    },
+    {
+      "query": "Nintendo 64 console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo 64"
+    },
+    {
+      "query": "Nintendo 64 official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo 64"
+    },
+    {
+      "query": "Nintendo 64 gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo 64"
+    },
+    {
+      "query": "GameCube console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/GameCube"
+    },
+    {
+      "query": "GameCube official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/GameCube"
+    },
+    {
+      "query": "GameCube gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/GameCube"
+    },
+    {
+      "query": "Wii console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Wii"
+    },
+    {
+      "query": "Wii official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Wii"
+    },
+    {
+      "query": "Wii gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Wii"
+    },
+    {
+      "query": "Wii U console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Wii U"
+    },
+    {
+      "query": "Wii U official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Wii U"
+    },
+    {
+      "query": "Wii U gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Wii U"
+    },
+    {
+      "query": "Nintendo Switch console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo Switch"
+    },
+    {
+      "query": "Nintendo Switch official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo Switch"
+    },
+    {
+      "query": "Nintendo Switch gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo Switch"
+    },
+    {
+      "query": "Nintendo Switch 2 console controller hardware accessories",
+      "intent": "console",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo Switch 2"
+    },
+    {
+      "query": "Nintendo Switch 2 official promotional art",
+      "intent": "official_art",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo Switch 2"
+    },
+    {
+      "query": "Nintendo Switch 2 gaming technology hardware",
+      "intent": "technology",
+      "target_category": "Consolas",
+      "target_entity": "Nintendo/Nintendo Switch 2"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "console",
+      "description": "Consolas console",
+      "queries": [
+        "NES console",
+        "SNES console",
+        "Nintendo 64 console",
+        "GameCube console",
+        "Wii console",
+        "Wii U console",
+        "Nintendo Switch console",
+        "Nintendo Switch 2 console"
+      ]
+    },
+    {
+      "kind": "official_art",
+      "description": "Consolas official_art",
+      "queries": [
+        "NES official_art",
+        "SNES official_art",
+        "Nintendo 64 official_art",
+        "GameCube official_art",
+        "Wii official_art",
+        "Wii U official_art",
+        "Nintendo Switch official_art",
+        "Nintendo Switch 2 official_art"
+      ]
+    },
+    {
+      "kind": "technology",
+      "description": "Consolas technology",
+      "queries": [
+        "NES technology",
+        "SNES technology",
+        "Nintendo 64 technology",
+        "GameCube technology",
+        "Wii technology",
+        "Wii U technology",
+        "Nintendo Switch technology",
+        "Nintendo Switch 2 technology"
+      ]
+    }
+  ]
+}
