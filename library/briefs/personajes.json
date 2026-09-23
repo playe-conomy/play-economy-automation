@@ -1,0 +1,117 @@
+{
+  "id": "library-personajes",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "Mario",
+      "Link",
+      "Master Chief",
+      "Leon S. Kennedy",
+      "CJ",
+      "Niko Bellic"
+    ],
+    "themes": [
+      "Personajes PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "Mario character official art",
+      "intent": "character",
+      "target_category": "Personajes",
+      "target_entity": "Mario"
+    },
+    {
+      "query": "Mario official promotional art",
+      "intent": "official_art",
+      "target_category": "Personajes",
+      "target_entity": "Mario"
+    },
+    {
+      "query": "Link character official art",
+      "intent": "character",
+      "target_category": "Personajes",
+      "target_entity": "Link"
+    },
+    {
+      "query": "Link official promotional art",
+      "intent": "official_art",
+      "target_category": "Personajes",
+      "target_entity": "Link"
+    },
+    {
+      "query": "Master Chief character official art",
+      "intent": "character",
+      "target_category": "Personajes",
+      "target_entity": "Master Chief"
+    },
+    {
+      "query": "Master Chief official promotional art",
+      "intent": "official_art",
+      "target_category": "Personajes",
+      "target_entity": "Master Chief"
+    },
+    {
+      "query": "Leon S. Kennedy character official art",
+      "intent": "character",
+      "target_category": "Personajes",
+      "target_entity": "Leon S. Kennedy"
+    },
+    {
+      "query": "Leon S. Kennedy official promotional art",
+      "intent": "official_art",
+      "target_category": "Personajes",
+      "target_entity": "Leon S. Kennedy"
+    },
+    {
+      "query": "CJ character official art",
+      "intent": "character",
+      "target_category": "Personajes",
+      "target_entity": "CJ"
+    },
+    {
+      "query": "CJ official promotional art",
+      "intent": "official_art",
+      "target_category": "Personajes",
+      "target_entity": "CJ"
+    },
+    {
+      "query": "Niko Bellic character official art",
+      "intent": "character",
+      "target_category": "Personajes",
+      "target_entity": "Niko Bellic"
+    },
+    {
+      "query": "Niko Bellic official promotional art",
+      "intent": "official_art",
+      "target_category": "Personajes",
+      "target_entity": "Niko Bellic"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "character",
+      "description": "Personajes character",
+      "queries": [
+        "Mario character",
+        "Link character",
+        "Master Chief character",
+        "Leon S. Kennedy character",
+        "CJ character",
+        "Niko Bellic character"
+      ]
+    },
+    {
+      "kind": "official_art",
+      "description": "Personajes official_art",
+      "queries": [
+        "Mario official_art",
+        "Link official_art",
+        "Master Chief official_art",
+        "Leon S. Kennedy official_art",
+        "CJ official_art",
+        "Niko Bellic official_art"
+      ]
+    }
+  ]
+}
