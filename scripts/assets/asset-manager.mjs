@@ -11,6 +11,7 @@ import { createOfficialWebAdapter } from "./official-web.mjs";
 import { searchOpenverse } from "./openverse.mjs";
 import { selectByScoreAndDiversity } from "./selection.mjs";
 import { searchWikimedia } from "./wikimedia.mjs";
+import { searchFlickrPublic } from "./flickr-public.mjs";
 
 const args = Object.fromEntries(process.argv.slice(2).map((arg, index, values) => arg.startsWith("--") ? [arg.slice(2), values[index + 1] ?? true] : null).filter(Boolean));
 const contentPath = resolve(args.content ?? "content/guitar-hero.json");
@@ -312,6 +313,7 @@ const officialSonyActivated = officialSonyAdapter?.isEligibleForCoverage(queries
 const providers = [
   { name: "Openverse", search: (query) => searchOpenverse(query, limits, (url, _limits, provider) => request(url, provider)) },
   { name: "Wikimedia", search: (query) => searchWikimedia(query, limits, (url, _limits, provider) => request(url, provider)) },
+  ...(config.providers?.flickr_public_enabled === true ? [{ name: "Flickr Public", search: (query) => searchFlickrPublic(query, limits, (url, _limits, provider) => request(url, provider)) }] : []),
   ...(activisionActivated ? [activisionAdapter] : []),
   ...(playstationActivated ? [playstationAdapter] : []),
   ...(sonyDesignActivated ? [sonyDesignAdapter] : []),
