@@ -1,0 +1,231 @@
+{
+  "id": "library-franquicias-core",
+  "scenes": [],
+  "entities": {
+    "items": [
+      "GTA",
+      "Resident Evil",
+      "Guitar Hero",
+      "Prince of Persia",
+      "Halo",
+      "The Legend of Zelda",
+      "Mario",
+      "Burnout",
+      "Def Jam"
+    ],
+    "themes": [
+      "Franquicias PLAYECONOMY reusable library"
+    ]
+  },
+  "visual_queries": [
+    {
+      "query": "GTA video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "GTA official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "GTA video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "GTA"
+    },
+    {
+      "query": "Resident Evil video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "Resident Evil"
+    },
+    {
+      "query": "Resident Evil official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "Resident Evil"
+    },
+    {
+      "query": "Resident Evil video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "Resident Evil"
+    },
+    {
+      "query": "Guitar Hero video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "Guitar Hero"
+    },
+    {
+      "query": "Guitar Hero official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "Guitar Hero"
+    },
+    {
+      "query": "Guitar Hero video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "Guitar Hero"
+    },
+    {
+      "query": "Prince of Persia video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "Prince of Persia"
+    },
+    {
+      "query": "Prince of Persia official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "Prince of Persia"
+    },
+    {
+      "query": "Prince of Persia video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "Prince of Persia"
+    },
+    {
+      "query": "Halo video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "Halo"
+    },
+    {
+      "query": "Halo official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "Halo"
+    },
+    {
+      "query": "Halo video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "Halo"
+    },
+    {
+      "query": "The Legend of Zelda video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "The Legend of Zelda official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "The Legend of Zelda video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "The Legend of Zelda"
+    },
+    {
+      "query": "Mario video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "Mario"
+    },
+    {
+      "query": "Mario official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "Mario"
+    },
+    {
+      "query": "Mario video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "Mario"
+    },
+    {
+      "query": "Burnout video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "Burnout"
+    },
+    {
+      "query": "Burnout official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "Burnout"
+    },
+    {
+      "query": "Burnout video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "Burnout"
+    },
+    {
+      "query": "Def Jam video game cover art",
+      "intent": "cover_art",
+      "target_category": "Franquicias",
+      "target_entity": "Def Jam"
+    },
+    {
+      "query": "Def Jam official promotional art",
+      "intent": "official_art",
+      "target_category": "Franquicias",
+      "target_entity": "Def Jam"
+    },
+    {
+      "query": "Def Jam video game",
+      "intent": "specific",
+      "target_category": "Franquicias",
+      "target_entity": "Def Jam"
+    }
+  ],
+  "asset_requirements": [
+    {
+      "kind": "cover_art",
+      "description": "Franquicias cover_art",
+      "queries": [
+        "GTA cover_art",
+        "Resident Evil cover_art",
+        "Guitar Hero cover_art",
+        "Prince of Persia cover_art",
+        "Halo cover_art",
+        "The Legend of Zelda cover_art",
+        "Mario cover_art",
+        "Burnout cover_art",
+        "Def Jam cover_art"
+      ]
+    },
+    {
+      "kind": "official_art",
+      "description": "Franquicias official_art",
+      "queries": [
+        "GTA official_art",
+        "Resident Evil official_art",
+        "Guitar Hero official_art",
+        "Prince of Persia official_art",
+        "Halo official_art",
+        "The Legend of Zelda official_art",
+        "Mario official_art",
+        "Burnout official_art",
+        "Def Jam official_art"
+      ]
+    },
+    {
+      "kind": "specific",
+      "description": "Franquicias specific",
+      "queries": [
+        "GTA specific",
+        "Resident Evil specific",
+        "Guitar Hero specific",
+        "Prince of Persia specific",
+        "Halo specific",
+        "The Legend of Zelda specific",
+        "Mario specific",
+        "Burnout specific",
+        "Def Jam specific"
+      ]
+    }
+  ]
+}
