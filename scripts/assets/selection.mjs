@@ -16,8 +16,7 @@ export function selectByScoreAndDiversity(eligible, { maxDownloads, maxSimilar =
       rightExactForm - leftExactForm,
       (right.scored?.semantic?.score ?? 0) - (left.scored?.semantic?.score ?? 0),
       (right.visualUtility?.score ?? 0) - (left.visualUtility?.score ?? 0),
-      (right.rights?.provenanceConfidence ?? 0) - (left.rights?.provenanceConfidence ?? 0),
-      (right.rights?.rightsClass === "open_license" ? 1 : 0) - (left.rights?.rightsClass === "open_license" ? 1 : 0),
+      (right.scored?.quality?.score ?? 0) - (left.scored?.quality?.score ?? 0),
       right.totalScore - left.totalScore
     ];
     return comparisons.find((value) => value !== 0) ?? String(left.candidate?.id ?? left.candidate?.sourceUrl ?? left.candidate?.title ?? "").localeCompare(String(right.candidate?.id ?? right.candidate?.sourceUrl ?? right.candidate?.title ?? ""));
