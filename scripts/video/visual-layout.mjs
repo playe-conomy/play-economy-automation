@@ -10,7 +10,8 @@ export const SAFE_ZONES = Object.freeze({
   main: Object.freeze({ left: 48, right: 1032, top: 170, bottom: 1470 }),
   subtitle: Object.freeze({ top: 1420, bottom: 1620 }),
   lowerPlatform: Object.freeze({ top: 1660, bottom: 1920 }),
-  branding: Object.freeze({ x: 72, y: 112 })
+  branding: Object.freeze({ x: 72, y: 112 }),
+  mediaForeground: Object.freeze({ x: 72, y: 430, width: 936, height: 890 })
 });
 
 export function wrapCaptionLines(value, maximumLineLength = 38) {
@@ -205,13 +206,13 @@ export function visualBeats({ scene, family, hasMedia, captionSegments, selected
 export function buildVisualLayout({ scene, selectedAsset = null, order = 0, duration }) {
   const family = resolveVisualFamily(scene, selectedAsset);
   const hasMedia = Boolean(selectedAsset);
-  const containsMedia = family === "cover_product" || family === "company_logo";
+  const preserveCompleteMedia = family === "cover_product" || family === "company_logo";
   const captionSegments = timedCaptionSegments(scene);
   const endCard = endCardTiming(duration);
   return {
     family,
     hasMedia,
-    mediaTreatment: hasMedia ? (containsMedia ? "contain" : "fill_crop") : "none",
+    mediaTreatment: hasMedia ? (preserveCompleteMedia ? "derived_background_contain" : "fill_crop") : "none",
     motion: hasMedia ? motionFor(family, order) : motionFor("brand", order),
     brandingMode: family === "brand" ? "large" : "small",
     subtitleMode: "scene_caption",

@@ -65,7 +65,10 @@ try {
     mediaGraph.indexOf(baseBackground, firstMediaInput) === -1,
     "no opaque full-screen V2 base is drawn after selected media"
   );
-  assert.match(mediaGraph, /scale=900:1120:force_original_aspect_ratio=decrease,pad=1080:1920/, "cover/product media fits inside the canvas");
+  assert.match(mediaGraph, /split=2\[scene_media_0_0_bg_source\]\[scene_media_0_0_fg_source\]/, "cover/product media splits into derived background and preserved foreground branches");
+  assert.match(mediaGraph, /scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=12:1,eq=brightness=-0\.18:saturation=0\.70/, "derived backgrounds cover the full frame, blur, darken, and reduce saturation");
+  assert.match(mediaGraph, /scale=936:890:force_original_aspect_ratio=decrease/, "derived foreground preserves its aspect ratio inside the fixed safe area");
+  assert.match(mediaGraph, /overlay=\(W-w\)\/2:430\+\(890-h\)\/2,setsar=1,setpts=PTS\+0\/TB\[scene_media_0_0\]/, "derived foreground is centered inside the safe area");
   assert.match(mediaGraph, /scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920/, "media scenes retain controlled fill/crop");
   assert.match(mediaGraph, /zoompan=z='min\(zoom\+0\.000/, "V4.1 media receives deterministic native FFmpeg motion");
   assert.match(mediaGraph, /trim=start=0:end=2\.742857142857143,setpts=PTS-STARTPTS/, "identity Beat A starts its media motion at the local beat origin");
@@ -111,6 +114,10 @@ try {
     ["cover_product", "media", "company_logo", "media", "cover_product"],
     "renderer debug output exposes the required five-scene Guitar Hero family plan"
   );
+  assert.equal(visualLayout.scenes[0].mediaTreatment, "derived_background_contain", "identity cover uses derived-background composition");
+  assert.equal(visualLayout.scenes[1].mediaTreatment, "fill_crop", "Activision gameplay remains fill/crop");
+  assert.equal(visualLayout.scenes[3].mediaTreatment, "fill_crop", "V4.3 contextual rock media remains fill/crop");
+  assert.equal(visualLayout.scenes.at(-1).mediaTreatment, "derived_background_contain", "controller conclusion preserves the complete product image");
   assert.equal(visualLayout.scenes[2].companyFallback, true, "debug output documents the Activision no_asset fallback");
   assert.equal(visualLayout.scenes[0].safeZones.subtitle.bottom, 1620, "debug output preserves the conservative subtitle safe zone");
   assert.equal(visualLayout.transparent_logo_available, true, "debug output records transparent official branding availability");
@@ -143,6 +150,23 @@ try {
   await prepare(emphasisOutput, sceneMediaPath, "with-emphasis", emphasizedContentPath);
   const emphasisCaptions = await readFile(join(emphasisOutput, "captions.ass"), "utf8");
   assert.match(emphasisCaptions, /\{\\c&HFF6B00&\}negocio\{\\c&HFFFFFF&\}/, "explicit caption emphasis remains supported");
+
+  const companyImagePath = join(testDirectory, "company.jpg");
+  await writeFile(companyImagePath, "synthetic company fixture");
+  const companySceneMediaPath = join(testDirectory, "company-scene-media.json");
+  await writeFile(companySceneMediaPath, JSON.stringify({
+    version: "4",
+    scenes: {
+      "activision-business": { asset_id: "company", media_type: "image", local_path: companyImagePath }
+    }
+  }));
+  const companyOutput = join(testDirectory, "company-media");
+  await prepare(companyOutput, companySceneMediaPath, "company-media");
+  const companyGraph = await readFile(join(companyOutput, "filtergraph.txt"), "utf8");
+  const companyLayout = JSON.parse(await readFile(join(companyOutput, "visual-layout.json"), "utf8"));
+  assert.equal(companyLayout.scenes[2].mediaTreatment, "derived_background_contain", "company media uses derived-background composition");
+  assert.match(companyGraph, /split=2\[scene_media_2_0_bg_source\]\[scene_media_2_0_fg_source\]/, "company media uses two deterministic branches");
+  assert.ok(!companyGraph.includes("text='APROVECHÓ EL MOMENTO'"), "company media does not activate the no-asset supporting-message fallback");
 } finally {
   process.argv = originalArgv;
   await rm(testDirectory, { recursive: true, force: true });

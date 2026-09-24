@@ -233,12 +233,18 @@ function mediaTransform(layout, beat) {
   if (beat.presentation === "media_reframe_y") {
     return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-ow)*0.5:(ih-oh)*0.7";
   }
-  return layout.mediaTreatment === "contain"
-    ? "scale=900:1120:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x07121F"
-    : "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920";
+  return "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920";
 }
 
 function mediaFilter(inputLabel, label, layout, beat) {
+  if (layout.mediaTreatment === "derived_background_contain") {
+    return [
+      `${inputLabel}trim=start=${beat.start}:end=${beat.end},setpts=PTS-STARTPTS,split=2[${label}_bg_source][${label}_fg_source]`,
+      `[${label}_bg_source]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=12:1,eq=brightness=-0.18:saturation=0.70[${label}_background]`,
+      `[${label}_fg_source]scale=936:890:force_original_aspect_ratio=decrease[${label}_foreground]`,
+      `[${label}_background][${label}_foreground]overlay=(W-w)/2:430+(890-h)/2,setsar=1,setpts=PTS+${beat.start}/TB[${label}]`
+    ].join(";");
+  }
   const increment = layout.family === "cover_product" ? "0.00015" : "0.00025";
   return `${inputLabel}trim=start=${beat.start}:end=${beat.end},setpts=PTS-STARTPTS,${mediaTransform(layout, beat)},zoompan=z='min(zoom+${increment},${beat.motion.zoomEnd})':d=1:s=1080x1920:fps=30,setsar=1,setpts=PTS+${beat.start}/TB[${label}]`;
 }

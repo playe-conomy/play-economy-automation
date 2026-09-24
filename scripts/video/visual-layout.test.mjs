@@ -26,17 +26,37 @@ assert.equal(resolveVisualFamily({ data: { label: "not numeric" } }), "media", "
 const cover = buildVisualLayout({ scene: definition.scenes[0], selectedAsset: { role: "cover_art" }, order: 0, duration: 27 });
 const media = buildVisualLayout({ scene: definition.scenes[1], selectedAsset: { role: "specific" }, order: 1, duration: 27 });
 const company = buildVisualLayout({ scene: definition.scenes[2], order: 2, duration: 27 });
-assert.equal(cover.mediaTreatment, "contain", "cover/product assets use fit/contain treatment");
+assert.equal(cover.mediaTreatment, "derived_background_contain", "cover/product assets preserve their full foreground over a derived background");
 assert.equal(media.mediaTreatment, "fill_crop", "media assets use controlled fill/crop treatment");
 assert.equal(company.companyFallback, true, "a company without an asset receives its generated fallback");
 assert.equal(company.title, "Activision", "company fallback uses the target entity");
 assert.equal(company.dataEnabled, false, "company fallback does not invent numeric graphics");
+assert.equal(buildVisualLayout({ scene: definition.scenes[2], selectedAsset: { asset_id: "company", role: "company" }, order: 2, duration: 27 }).mediaTreatment, "derived_background_contain", "company media preserves the complete source over a derived background");
+assert.equal(buildVisualLayout({ scene: { visual_family: "data_economy", data: { value: 1 } }, selectedAsset: { asset_id: "data" }, order: 0, duration: 10 }).mediaTreatment, "fill_crop", "data-economy media retains its existing fill/crop treatment");
+assert.equal(buildVisualLayout({ scene: { visual_family: "brand" }, selectedAsset: null, order: 0, duration: 10 }).mediaTreatment, "none", "brand-only scenes retain no-media behavior");
 assert.deepEqual(media.motion, buildVisualLayout({ scene: definition.scenes[1], selectedAsset: { role: "specific" }, order: 1, duration: 27 }).motion, "motion is deterministic");
 assert.ok(media.motion.zoomEnd >= 1.02 && media.motion.zoomEnd <= 1.06, "media motion remains within the 2-6 percent range");
 assert.ok(cover.motion.zoomEnd >= 1.01 && cover.motion.zoomEnd <= 1.03, "cover motion remains within the 1-3 percent range");
 assert.deepEqual(endCardTiming(27), { start: 25, end: 27, duration: 2 }, "a 27-second V4.1 video reserves its final two seconds for the end card");
 assert.deepEqual(SAFE_ZONES.main, { left: 48, right: 1032, top: 170, bottom: 1470 }, "main safe zone is conservative for mobile UI");
 assert.deepEqual(SAFE_ZONES.subtitle, { top: 1420, bottom: 1620 }, "subtitle safe zone avoids the lower platform area");
+assert.deepEqual(SAFE_ZONES.mediaForeground, { x: 72, y: 430, width: 936, height: 890 }, "derived foreground stays between headline and subtitle safe zones");
+const foregroundFit = (width, height) => {
+  const scale = Math.min(SAFE_ZONES.mediaForeground.width / width, SAFE_ZONES.mediaForeground.height / height);
+  return { width: width * scale, height: height * scale };
+};
+for (const [label, width, height] of [
+  ["ultrawide", 2400, 1000],
+  ["sixteen-nine", 1920, 1080],
+  ["four-three", 1600, 1200],
+  ["square", 1200, 1200],
+  ["portrait", 1200, 1800],
+  ["nine-sixteen", 1080, 1920]
+]) {
+  const fitted = foregroundFit(width, height);
+  assert.ok(fitted.width <= SAFE_ZONES.mediaForeground.width && fitted.height <= SAFE_ZONES.mediaForeground.height, `${label} foreground stays within the safe area`);
+  assert.ok(Math.abs((fitted.width / fitted.height) - (width / height)) < 0.000001, `${label} foreground preserves its original aspect ratio`);
+}
 assert.ok(!layoutSource.includes("fetch("), "visual layout has no network operation");
 assert.ok(!layoutSource.includes("drive"), "visual layout has no Drive operation");
 

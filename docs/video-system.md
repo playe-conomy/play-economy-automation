@@ -27,7 +27,7 @@ The renderer uses the avatar as a small in-video mark and shows the main logo in
 ## V4.1 visual layout
 
 - Legacy V2 invocation without `scene-media.json` retains its generated visual graph, including its existing 23–27 second end card.
-- V4.1 scene media uses a dark base, selected image treatment, minimal foreground typography, captions, then branding/end card. Media scenes use controlled fill/crop; product and company assets use fit/contain treatment to avoid destructive cropping.
+- V4.1 scene media uses a dark base, selected image treatment, minimal foreground typography, captions, then branding/end card. Media scenes use controlled fill/crop. V4.4 preserves complete product and company assets as a sharp foreground inside `x=72, y=430, w=936, h=890`, composited over a deterministic blurred and darkened background derived from the same local image.
 - The V4.1 renderer writes an ephemeral `output/visual-layout.json` debug plan with family, media treatment, motion, safe zones, branding mode, subtitle mode, and end-card timing. It is derived only from content plus local scene-media references.
 - Generic decorative bar charts and the large central dark box are not used in normal V4.1 scenes. Data graphics require explicit structured numeric `scene.data`; otherwise the renderer does not invent values.
 - V4.1 captions remain scene-timed. They use a conservative lower safe zone, compact wrapping, and optional electric-blue emphasis only when content explicitly provides `caption_emphasis`.
@@ -37,6 +37,7 @@ The renderer uses the avatar as a small in-video mark and shows the main logo in
 - V4.2 adds ephemeral `visualBeats` to the local visual-layout debug plan. Eligible scenes receive at most two continuous presentations, preferring an existing caption boundary 1.8–3.5 seconds into the scene and otherwise using a deterministic midpoint. When a scene overlaps the end card, its normal beats end at the end-card start. Caption segmentation itself is unchanged.
 - V4.2 gives selected local media a conservative establishing and detail/reframe presentation every roughly 2–3 seconds. Each beat trims and re-timestamps its FFmpeg branch, so motion begins when that beat is visible rather than at global render time.
 - A local image can fan out through FFmpeg `split` for multiple beats or scenes without another Drive read, download, mapper assignment, or persistent catalog change. `visualBeats` and their media references exist only in runner output.
+- V4.4 uses an additional local FFmpeg split only for `cover_product` and `company_logo` media: one branch fills, blurs, darkens, and desaturates the full 1080x1920 background; the other keeps the uncropped asset inside the foreground safe area. Gameplay and contextual media retain their existing fill/crop path. No source media or derived image is persisted.
 
 ## Add a topic
 
