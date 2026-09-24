@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { buildScenePlan } from "./scene-mapper.mjs";
+import { createHash } from "node:crypto";
+import { buildScenePlan, deriveScenes } from "./scene-mapper.mjs";
 
 function asset(id, overrides = {}) {
   return {
@@ -102,6 +103,53 @@ const reuseScorePlan = plan([
   scene("reuse-second", "Guitar Hero", ["specific"])
 ], [substantiallyBetter, weakAlternative]);
 assert.equal(reuseScorePlan.scenes[1].selected_assets[0].assignment_score, reuseScorePlan.scenes[0].selected_assets[0].assignment_score - 35, "reuse penalty remains exactly 35 per prior use");
+
+const genericHardware = asset("generic-hardware", {
+  asset_role: "contextual_broll",
+  final_entity: null,
+  query: "CPU technology hardware",
+  tags: ["computer", "electronics", "electric"],
+  semantic_relevance: { score: 99, passed: true, matched_terms: ["cpu", "technology", "hardware"] },
+  total_score: 198,
+  quality_tier: "usable"
+});
+const concertBroll = asset("concert-broll", {
+  asset_role: "contextual_broll",
+  final_entity: null,
+  query: "electric guitar concert",
+  tags: ["music", "rock", "concert", "guitar", "band"],
+  semantic_relevance: { score: 76, passed: true, matched_terms: ["electric", "guitar", "concert"] },
+  total_score: 142,
+  quality_tier: "usable"
+});
+const contextualScene = scene("contextual-terms", null, ["contextual_broll"], "rock_music_context");
+const legacyContextual = plan([contextualScene], [genericHardware, concertBroll]);
+assert.equal(legacyContextual.scenes[0].selected_assets[0].asset_id, "generic-hardware", "contextual scoring remains unchanged when visual_terms are absent");
+const visualTermsContextual = plan([{ ...contextualScene, visual_terms: [" Concert ", "GUITAR", "concert", "MUSIC"] }], [genericHardware, concertBroll]);
+assert.equal(visualTermsContextual.scenes[0].selected_assets[0].asset_id, "concert-broll", "scene visual terms break compatible contextual ties toward concert imagery");
+assert.ok(visualTermsContextual.scenes[0].selected_assets[0].assignment_reasons.includes("semantic_scene_match:24"));
+assert.ok(visualTermsContextual.scenes[0].selected_assets[0].assignment_reasons.includes("visual_terms:concert,guitar,music"));
+assert.deepEqual(deriveScenes({ scenes: [{ scene_id: "normalization", visual_terms: [" Rock ", "rock", "MUSIC", null, ""] }] })[0].visual_terms, ["music", "rock"], "visual terms normalize case, whitespace, duplicates, and absent values deterministically");
+
+const activisionGameplay = asset("activision-gameplay", {
+  asset_role: "gameplay",
+  source: "activision-games-blog",
+  final_entity: "Guitar Hero",
+  semantic_relevance: { score: 105, passed: true },
+  total_score: 227,
+  quality_tier: "usable"
+});
+assert.equal(plan([gameplayIntent], [intentSpecific, activisionGameplay]).scenes[0].selected_assets[0].asset_id, "activision-gameplay", "same-entity Activision gameplay remains preferred for gameplay intent");
+
+const entitySceneWithTerms = { ...scene("entity-terms", "Guitar Hero", ["cover_art"], "franchise_identity"), visual_terms: ["concert"], allow_contextual_fallback: true };
+assert.equal(plan([entitySceneWithTerms], [cover, concertBroll]).scenes[0].selected_assets[0].asset_id, "cover", "contextual semantic matching cannot displace an exact entity preferred-role asset");
+assert.equal(plan([{ ...scene("incompatible-terms", "Guitar Hero", ["cover_art"], "franchise_identity"), visual_terms: ["concert"] }], [concertBroll]).scenes[0].selected_assets.length, 0, "visual terms alone never make an incompatible asset eligible");
+const deterministicTermsPlan = plan([{ ...contextualScene, visual_terms: ["guitar", "concert"] }], [genericHardware, concertBroll]);
+assert.equal(
+  createHash("sha256").update(JSON.stringify(deterministicTermsPlan)).digest("hex"),
+  createHash("sha256").update(JSON.stringify(plan([{ ...contextualScene, visual_terms: ["guitar", "concert"] }], [genericHardware, concertBroll]))).digest("hex"),
+  "visual term scene plans remain byte-for-byte deterministic"
+);
 
 const historicalAssets = [
   asset("asset-adb373ee0b4d9dc2", { asset_role: "cover_art", quality_tier: "usable", semantic_relevance: { score: 121, passed: true }, total_score: 241 }),

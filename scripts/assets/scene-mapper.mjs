@@ -5,6 +5,8 @@ import { qualityTier } from "./catalog.mjs";
 
 const ASSIGNABLE_STATUSES = new Set(["approved", "downloaded", "uploaded"]);
 const ENTITY_COMPATIBLE_ROLES = new Set(["cover_art", "official_art", "specific", "gameplay", "company", "console", "character", "map"]);
+const SCENE_TERM_WEIGHT = 8;
+const MAX_SCENE_SEMANTIC_MATCH = 24;
 
 function compareAssetIds(left, right) {
   return String(left.id) < String(right.id) ? -1 : String(left.id) > String(right.id) ? 1 : 0;
@@ -32,8 +34,46 @@ export function deriveScenes(content) {
     visual_intent: scene.visual_intent ?? "contextual",
     target_entity: scene.target_entity ?? null,
     preferred_roles: scene.preferred_roles ?? ["contextual_broll"],
+    visual_terms: normalizeVisualTerms(scene.visual_terms),
     allow_contextual_fallback: Boolean(scene.allow_contextual_fallback)
   }));
+}
+
+function normalizeVisualTerms(terms) {
+  if (!Array.isArray(terms)) return [];
+  const normalized = new Set();
+  for (const term of terms) {
+    if (typeof term !== "string") continue;
+    const value = term.trim().toLowerCase();
+    if (value) normalized.add(value);
+  }
+  return [...normalized].sort();
+}
+
+function textTokens(value) {
+  return String(value ?? "").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+function assetSemanticTerms(asset) {
+  const values = [
+    asset.query,
+    ...(Array.isArray(asset.tags) ? asset.tags : []),
+    ...(Array.isArray(asset.semantic_relevance?.matched_terms) ? asset.semantic_relevance.matched_terms : []),
+    asset.final_entity,
+    asset.franchise,
+    asset.title
+  ];
+  return new Set(values.flatMap(textTokens));
+}
+
+function sceneSemanticMatch(scene, asset) {
+  if (!scene.visual_terms.length) return { score: 0, matchedTerms: [] };
+  const corpus = assetSemanticTerms(asset);
+  const matchedTerms = scene.visual_terms.filter((term) => corpus.has(term));
+  return {
+    score: Math.min(matchedTerms.length * SCENE_TERM_WEIGHT, MAX_SCENE_SEMANTIC_MATCH),
+    matchedTerms
+  };
 }
 
 function assignableAssets(manifest) {
@@ -80,12 +120,14 @@ function scoreAssignment(scene, asset, reuseCount) {
   const existingScore = Math.min(Math.max(Number(asset.total_score ?? 0), 0) / 5, 35);
   const reusePenalty = reuseCount * 35;
   const intentRoleBonus = targetMatches(scene, asset) && asset.asset_role === scene.visual_intent && asset.semantic_relevance?.passed !== false ? 12 : 0;
-  const score = stageScore + roleScore + relevance + qualityScore(asset) + existingScore + intentRoleBonus - reusePenalty;
+  const semanticSceneMatch = sceneSemanticMatch(scene, asset);
+  const score = stageScore + roleScore + relevance + qualityScore(asset) + existingScore + intentRoleBonus + semanticSceneMatch.score - reusePenalty;
   const reasons = [stage];
   if (targetMatches(scene, asset)) reasons.push("target_entity_match");
   if (preferredIndex >= 0) reasons.push(`preferred_role:${preferredIndex + 1}`);
   if (semanticScore(asset)) reasons.push(`semantic_relevance:${semanticScore(asset)}`);
   if (intentRoleBonus) reasons.push(`visual_intent_role_match:${intentRoleBonus}`);
+  if (semanticSceneMatch.score) reasons.push(`semantic_scene_match:${semanticSceneMatch.score}`, `visual_terms:${semanticSceneMatch.matchedTerms.join(",")}`);
   if (reuseCount) reasons.push(`reuse_penalty:${reusePenalty}`);
   return { score, stage, reasons, reuseCount };
 }
