@@ -1,0 +1,70 @@
+name: PlayEconomy artifact cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_days:
+        description: "Conservar artifacts creados durante los últimos N días"
+        required: true
+        default: "7"
+  schedule:
+    - cron: "17 8 * * 1"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      KEEP_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_days || '7' }}
+    steps:
+      - name: Validate retention window
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$KEEP_DAYS" =~ ^([1-9]|[12][0-9]|30)$ ]]; then
+            echo "::error::keep_days must be an integer from 1 through 30."
+            exit 1
+          fi
+
+      - name: Delete expired review artifacts
+        uses: actions/github-script@v7
+        env:
+          KEEP_DAYS: ${{ env.KEEP_DAYS }}
+        with:
+          script: |
+            const keepDays = Number.parseInt(process.env.KEEP_DAYS, 10);
+            const cutoff = Date.now() - (keepDays * 24 * 60 * 60 * 1000);
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const activeArtifacts = artifacts.filter((artifact) => !artifact.expired);
+            let deleted = 0;
+            for (const artifact of activeArtifacts) {
+              const createdAt = Date.parse(artifact.created_at);
+              if (Number.isFinite(createdAt) && createdAt < cutoff) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                deleted += 1;
+              }
+            }
+
+            const retained = activeArtifacts.length - deleted;
+            await core.summary
+              .addHeading('PlayEconomy artifact cleanup')
+              .addTable([
+                [{ data: 'Retention window', header: true }, `${keepDays} day(s)`],
+                [{ data: 'Artifacts deleted', header: true }, String(deleted)],
+                [{ data: 'Artifacts retained', header: true }, String(retained)],
+              ])
+              .addRaw('Only GitHub Actions artifacts were modified.')
+              .write();
