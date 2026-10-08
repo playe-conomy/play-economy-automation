@@ -1,0 +1,63 @@
+name: Audit Actions caches
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit-caches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List Actions caches
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const caches = await github.paginate(
+              github.rest.actions.getActionsCacheList,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 }
+            );
+
+            const active = caches.filter(c => !c.deleted_at);
+            const totalBytes = active.reduce(
+              (sum, c) => sum + Number(c.size_in_bytes || 0), 0
+            );
+
+            const fmt = (bytes) => {
+              if (bytes < 1024) return bytes + ' B';
+              if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(2) + ' KB';
+              if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(2) + ' MB';
+              return (bytes / 1024 ** 3).toFixed(3) + ' GB';
+            };
+
+            console.log('=== ACTIONS CACHE AUDIT ===');
+            console.log('Repository:', context.repo.owner + '/' + context.repo.repo);
+            console.log('Active caches:', active.length);
+            console.log('Total cache storage:', fmt(totalBytes));
+            console.log('Total bytes:', totalBytes);
+
+            for (const c of [...active].sort(
+              (a,b) => Number(b.size_in_bytes || 0) - Number(a.size_in_bytes || 0)
+            )) {
+              console.log('---');
+              console.log('ID:', c.id);
+              console.log('Key:', c.key);
+              console.log('Ref:', c.ref);
+              console.log('Size:', fmt(Number(c.size_in_bytes || 0)));
+              console.log('Created:', c.created_at);
+              console.log('Last accessed:', c.last_accessed_at);
+            }
+
+            if (active.length === 0) console.log('No Actions caches found.');
+
+            await core.summary
+              .addHeading('GitHub Actions cache audit')
+              .addTable([
+                [{data:'Active caches',header:true}, String(active.length)],
+                [{data:'Total cache storage',header:true}, fmt(totalBytes)],
+                [{data:'Total bytes',header:true}, String(totalBytes)]
+              ])
+              .addRaw('Read-only audit. Nothing was deleted.')
+              .write();
