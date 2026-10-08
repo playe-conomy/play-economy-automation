@@ -1,0 +1,77 @@
+name: Audit all Actions artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inventory all active artifacts
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 }
+            );
+
+            const active = artifacts.filter(a => !a.expired);
+            const expired = artifacts.filter(a => a.expired);
+            const totalBytes = active.reduce((s,a) => s + Number(a.size_in_bytes || 0), 0);
+
+            const fmt = (b) => {
+              if (b < 1024) return b + ' B';
+              if (b < 1024 ** 2) return (b/1024).toFixed(2) + ' KB';
+              if (b < 1024 ** 3) return (b/1024**2).toFixed(2) + ' MB';
+              return (b/1024**3).toFixed(3) + ' GB';
+            };
+
+            console.log('=== COMPLETE ACTIONS ARTIFACT AUDIT ===');
+            console.log('Repository:', context.repo.owner + '/' + context.repo.repo);
+            console.log('Artifacts returned:', artifacts.length);
+            console.log('Active artifacts:', active.length);
+            console.log('Expired artifacts:', expired.length);
+            console.log('ACTIVE TOTAL:', fmt(totalBytes));
+            console.log('ACTIVE TOTAL BYTES:', totalBytes);
+
+            const byName = new Map();
+            for (const a of active) {
+              const v = byName.get(a.name) || {count:0, bytes:0};
+              v.count += 1;
+              v.bytes += Number(a.size_in_bytes || 0);
+              byName.set(a.name, v);
+            }
+
+            console.log('=== TOTALS BY ARTIFACT NAME ===');
+            for (const [name,v] of [...byName.entries()].sort((a,b)=>b[1].bytes-a[1].bytes)) {
+              console.log(name + ' | count=' + v.count + ' | ' + fmt(v.bytes) + ' | bytes=' + v.bytes);
+            }
+
+            console.log('=== EVERY ACTIVE ARTIFACT ===');
+            for (const a of [...active].sort((a,b)=>Number(b.size_in_bytes||0)-Number(a.size_in_bytes||0))) {
+              console.log([
+                'id=' + a.id,
+                'name=' + a.name,
+                'size=' + fmt(Number(a.size_in_bytes || 0)),
+                'bytes=' + Number(a.size_in_bytes || 0),
+                'created=' + a.created_at,
+                'expires=' + a.expires_at,
+                'workflow_run=' + (a.workflow_run?.id || '')
+              ].join(' | '));
+            }
+
+            await core.summary
+              .addHeading('Complete Actions artifact audit')
+              .addTable([
+                [{data:'Active artifacts',header:true}, String(active.length)],
+                [{data:'Expired artifacts returned',header:true}, String(expired.length)],
+                [{data:'Active artifact storage',header:true}, fmt(totalBytes)],
+                [{data:'Active bytes',header:true}, String(totalBytes)]
+              ])
+              .addRaw('Read-only audit. No artifacts were deleted or modified.')
+              .write();
